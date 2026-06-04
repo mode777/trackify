@@ -1,0 +1,27 @@
+# Build output
+build/
+
+# CMake user-specific files
+CMakeUserPresets.json
+CMakeSettings.json
+
+# Editor / IDE
+.vs/
+.vscode/settings.json
+.vscode/launch.json
+*.user
+*.suo
+*.sdf
+
+# Emscripten SDK downloads and toolchain (managed by emsdk, not source)
+submodules/emsdk/downloads/
+submodules/emsdk/node/
+submodules/emsdk/python/
+submodules/emsdk/upstream/
+submodules/emsdk/.emscripten
+submodules/emsdk/.emscripten_cache/
+submodules/emsdk/.emscripten_ports/
+
+# OS
+.DS_Store
+Thumbs.db
