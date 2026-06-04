@@ -32,6 +32,23 @@ is required.
 
 ## Building
 
+### 0. Initialize submodules (one-time, after cloning)
+
+This repository uses Git submodules for the emulator cores, the generic player,
+and the Emscripten SDK. After cloning, populate them with:
+
+```bash
+git submodule update --init --recursive
+```
+
+To bring all submodules up to the pinned commit after a `git pull`:
+
+```bash
+git submodule update --recursive
+```
+
+---
+
 ### 1. Install & activate the Emscripten SDK (one-time)
 
 ```powershell
