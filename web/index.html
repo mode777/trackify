@@ -4,20 +4,25 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Trackify - VGM Web Player</title>
-<link href="app.css" rel="stylesheet" type="text/css" />
 
 <!-- Generic player first (defines ScriptNodePlayer + the Ems* adapter base classes),
-     then the two backends (define backend_PSX/backend_SNES + their adapter subclasses),
+     then the backends (define backend_* modules + adapter subclasses),
      finally the UI. -->
-<script src="scriptprocessor_player.js"></script>
-<script src="backend_psx.js"></script>
-<script src="backend_snes.js"></script>
+<script>
+    // Generated backend wrappers read this prefix in locateFile(path).
+    // Keep it relative so both root and sub-path hosting work.
+    window.WASM_SEARCH_PATH = 'wasm/';
+</script>
+<script src="/wasm/scriptprocessor_player.js"></script>
+<script src="/wasm/backend_psx.js"></script>
+<script src="/wasm/backend_snes.js"></script>
+<script src="/wasm/backend_nez.js"></script>
 </head>
 
 <body>
 <main>
     <h1>Trackify</h1>
-    <p class="subtitle">VGM web player &mdash; PSX/PSF &amp; SNES/SPC</p>
+    <p class="subtitle">VGM web player &mdash; PSX/PSF, SNES/SPC &amp; NEZ (BGM/OPX/NSF/SNG/KSS)</p>
 
     <ul id="trackList" class="track-list"></ul>
 
@@ -32,6 +37,6 @@
     <dl id="songInfo" class="song-info"></dl>
 </main>
 
-<script src="app.js"></script>
+<script type="module" src="/main.js"></script>
 </body>
 </html>

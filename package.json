@@ -1,0 +1,19 @@
+{
+  "name": "trackify",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Trackify web tooling orchestration (Vite + CMake artifacts)",
+  "scripts": {
+    "wasm:configure": "./submodules/emsdk/upstream/emscripten/emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON",
+    "wasm:build": "cmake --build build --target player backend_psx backend_snes backend_nez",
+    "wasm": "npm run wasm:configure && npm run wasm:build",
+    "assets:prepare": "node tools/prepare-web-assets.mjs",
+    "dev": "npm run wasm && npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
+    "build": "npm run wasm && npm run assets:prepare && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 8137",
+    "verify:dist": "node tools/verify-build-output.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

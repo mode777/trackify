@@ -1,21 +1,22 @@
 /*
  * Trackify UI - minimal VGM player.
  *
- * Auto-selects the PSX (PSF) or SNES (SPC) Emscripten backend by file
- * extension and drives the generic ScriptNodePlayer.
+ * Auto-selects an Emscripten backend by file extension (PSX, SNES, NEZ)
+ * and drives the generic ScriptNodePlayer.
  */
 'use strict';
 
-const TRACKS = [
-    { title: 'Super James Pond - Codename RoboCod', file: 'super james pond - codename robocod.spc' },
-    { title: '01 Main Menu', file: '01 main menu.minipsf' },
-];
+const SAMPLE_INDEX_URL = 'sample-files/index.json';
+const SAMPLE_BASE_PATH = 'sample-files/';
 
 const EXT_PSX = ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'];
 const EXT_SNES = ['spc', 'rsn'];
+const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
+const runtime = globalThis;
 
 let currentIndex = -1;
 let busy = false;
+let tracks = [];
 
 const els = {
     list: document.getElementById('trackList'),
@@ -32,33 +33,71 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
+    if (EXT_NEZ.includes(ext)) return 'nez';
     if (EXT_SNES.includes(ext)) return 'snes';
     if (EXT_PSX.includes(ext)) return 'psx';
     return null;
 }
 
-// Modern Emscripten dropped Module.Pointer_stringify, but snes_adapter.js still
-// calls it. Install a lazy shim that resolves UTF8ToString at call time.
-function installPointerStringifyShim() {
-    if (typeof backend_SNES !== 'undefined' && backend_SNES.Module && !backend_SNES.Module.Pointer_stringify) {
-        const m = backend_SNES.Module;
+// Modern Emscripten dropped Module.Pointer_stringify, but some legacy adapters
+// still call it. Install a lazy shim that resolves UTF8ToString at call time.
+function installPointerStringifyShim(moduleNamespace) {
+    if (moduleNamespace && moduleNamespace.Module && !moduleNamespace.Module.Pointer_stringify) {
+        const m = moduleNamespace.Module;
         m.Pointer_stringify = function (ptr) { return m.UTF8ToString(ptr); };
     }
 }
 
 function makeAdapter(type) {
-    if (type === 'snes') {
-        installPointerStringifyShim();
-        return new SNESBackendAdapter();
+    const PSXAdapterCtor = runtime.PSXBackendAdapter ||
+        (typeof PSXBackendAdapter !== 'undefined' ? PSXBackendAdapter : null);
+    const SNESAdapterCtor = runtime.SNESBackendAdapter ||
+        (typeof SNESBackendAdapter !== 'undefined' ? SNESBackendAdapter : null);
+    const NEZAdapterCtor = runtime.NEZBackendAdapter ||
+        (typeof NEZBackendAdapter !== 'undefined' ? NEZBackendAdapter : null);
+
+    if (type === 'nez') {
+        if (!NEZAdapterCtor) {
+            throw new Error('NEZ backend adapter is not available');
+        }
+        installPointerStringifyShim(runtime.backend_NEZ);
+        return new NEZAdapterCtor();
     }
-    return new PSXBackendAdapter();
+
+    if (type === 'snes') {
+        if (!SNESAdapterCtor) {
+            throw new Error('SNES backend adapter is not available');
+        }
+        installPointerStringifyShim(runtime.backend_SNES);
+        return new SNESAdapterCtor();
+    }
+    if (!PSXAdapterCtor) {
+        throw new Error('PSX backend adapter is not available');
+    }
+    return new PSXAdapterCtor();
 }
 
 function setStatus(msg) { els.status.textContent = msg; }
 
+function parseTracksManifest(data) {
+    const entries = Array.isArray(data) ? data : data && Array.isArray(data.tracks) ? data.tracks : null;
+    if (!entries) throw new Error('Invalid tracks manifest format');
+
+    return entries
+        .filter((entry) => entry && typeof entry.title === 'string' && typeof entry.file === 'string')
+        .map((entry) => ({ title: entry.title, file: entry.file }));
+}
+
+async function loadTracks() {
+    const res = await fetch(SAMPLE_INDEX_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error('Failed to fetch tracks manifest: ' + res.status);
+    const json = await res.json();
+    tracks = parseTracksManifest(json);
+}
+
 function renderTracks() {
     els.list.innerHTML = '';
-    TRACKS.forEach((t, i) => {
+    tracks.forEach((t, i) => {
         const li = document.createElement('li');
         li.dataset.index = String(i);
         if (i === currentIndex) li.classList.add('active');
@@ -78,7 +117,7 @@ function renderTracks() {
 
 function renderSongInfo() {
     els.info.innerHTML = '';
-    const player = ScriptNodePlayer.getInstance();
+    const player = runtime.ScriptNodePlayer.getInstance();
     if (!player) return;
 
     let info;
@@ -98,14 +137,15 @@ function renderSongInfo() {
 }
 
 function updatePlayButton() {
-    const player = ScriptNodePlayer.getInstance();
+    const player = runtime.ScriptNodePlayer.getInstance();
     const paused = !player || player.isPaused();
     els.play.innerHTML = paused ? '&#9654;' : '&#10074;&#10074;';
 }
 
 async function selectTrack(index, autoplay) {
     if (busy) return;
-    const track = TRACKS[index];
+    const track = tracks[index];
+    if (!track) return;
     const type = typeOf(track.file);
     if (!type) { setStatus('Unsupported file type: ' + track.file); return; }
 
@@ -119,11 +159,11 @@ async function selectTrack(index, autoplay) {
         // A fresh adapter is created per selection; ScriptNodePlayer.initialize()
         // tears down the previous backend pipeline before wiring up the new one.
         const adapter = makeAdapter(type);
-        await ScriptNodePlayer.initialize(adapter, onTrackEnd, [], false);
-        await ScriptNodePlayer.loadMusicFromURL(track.file, {});
+        await runtime.ScriptNodePlayer.initialize(adapter, onTrackEnd, [], false);
+        await runtime.ScriptNodePlayer.loadMusicFromURL(SAMPLE_BASE_PATH + track.file, {});
 
         renderSongInfo();
-        const player = ScriptNodePlayer.getInstance();
+        const player = runtime.ScriptNodePlayer.getInstance();
         if (autoplay && player) player.play();
         updatePlayButton();
         setStatus(autoplay ? 'Playing' : 'Ready');
@@ -136,13 +176,14 @@ async function selectTrack(index, autoplay) {
 }
 
 function onTrackEnd() {
+    if (!tracks.length) return;
     // Auto-advance to the next track.
-    const next = (currentIndex + 1) % TRACKS.length;
+    const next = (currentIndex + 1) % tracks.length;
     selectTrack(next, true);
 }
 
 function togglePlay() {
-    const player = ScriptNodePlayer.getInstance();
+    const player = runtime.ScriptNodePlayer.getInstance();
     if (!player) {
         if (currentIndex >= 0) selectTrack(currentIndex, true);
         return;
@@ -154,15 +195,33 @@ function togglePlay() {
 }
 
 function init() {
-    renderTracks();
-
     els.play.addEventListener('click', togglePlay);
-    els.next.addEventListener('click', () => selectTrack((currentIndex + 1 + TRACKS.length) % TRACKS.length, true));
-    els.prev.addEventListener('click', () => selectTrack((currentIndex - 1 + TRACKS.length) % TRACKS.length, true));
+    els.next.addEventListener('click', () => {
+        if (!tracks.length) return;
+        selectTrack((currentIndex + 1 + tracks.length) % tracks.length, true);
+    });
+    els.prev.addEventListener('click', () => {
+        if (!tracks.length) return;
+        selectTrack((currentIndex - 1 + tracks.length) % tracks.length, true);
+    });
 
-    // Preload the first track's metadata (without autoplay - browsers require a
-    // user gesture before audio can start).
-    selectTrack(0, false);
+    setStatus('Loading track list...');
+    loadTracks()
+        .then(() => {
+            renderTracks();
+            if (!tracks.length) {
+                setStatus('No tracks found in sample-files/index.json');
+                return;
+            }
+
+            // Preload the first track's metadata (without autoplay - browsers require a
+            // user gesture before audio can start).
+            selectTrack(0, false);
+        })
+        .catch((err) => {
+            console.error('Failed to load tracks', err);
+            setStatus('Error loading sample-files/index.json (see console)');
+        });
 }
 
 if (document.readyState === 'loading') {

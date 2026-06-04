@@ -1,26 +1,38 @@
 # Trackify — VGM Web Audio Player
 
 A clean, single-page web player for Video Game Music (VGM) files. It reuses the
-generic [`webaudio-player`](submodules/webaudio-player) engine together with two
+generic [`webaudio-player`](submodules/webaudio-player) engine together with three
 Emscripten-compiled emulator cores:
 
 | Backend | Source core | Formats | Memory |
 | ------- | ----------- | ------- | ------ |
 | **PSX** | [`webpsx`](submodules/webpsx) (HighlyExperimental) | `.psf` / `.minipsf` (+ `.psflib`) | 128 MB |
 | **SNES** | [`websnes`](submodules/websnes) (Game Music Emu) | `.spc` | 64 MB |
+| **NEZ** | [`webnez`](submodules/webnez) (NEZplug++) | `.bgm` / `.opx` / `.nsf` / `.sng` / `.kss` | 64 MB |
 
 The UI auto-selects the backend by file extension, decodes audio in WebAssembly,
 and streams it through a `ScriptProcessorNode` pipeline.
+
+Track metadata is loaded at runtime from `sample-files/index.json` (array of
+`{ title, file }` objects), and audio files are fetched from the same
+`sample-files/` directory.
 
 ---
 
 ## Prerequisites
 
-The build is driven entirely by **CMake + Emscripten** (`emcmake`). You need:
+The project now uses a hybrid build:
+
+- **CMake + Emscripten** for WASM/runtime artifacts
+- **Node.js + Vite** for web app build/dev workflow
+
+You need:
 
 - **CMake** ≥ 3.21
 - **Ninja**
-- **Python 3** (for the bundled emsdk and the dev HTTP server)
+- **Node.js** ≥ 20
+- **npm**
+- **Python 3** (for the bundled emsdk)
 - **Git**
 - A modern browser (Web Audio API + WebAssembly)
 
@@ -73,41 +85,87 @@ source ./submodules/emsdk/emsdk_env.sh
 
 Verify with `emcc --version`.
 
-### 3. Configure & build
+### 3. Install JavaScript tooling (one-time)
+
+From the repository root:
+
+```bash
+npm install
+```
+
+### 4. Build (WASM + web app)
+
+From the repository root:
+
+```bash
+npm run build
+```
+
+This runs:
+
+1. CMake in JS-tooling mode (`TRACKIFY_JS_TOOLING=ON`) to produce runtime
+   artifacts under `build/wasm/`
+2. Asset preparation into `build/web-public/`
+3. Vite production build into `build/dist/`
+
+Expected output (simplified):
+
+```
+build/
+├── wasm/
+│   ├── scriptprocessor_player.js
+│   ├── backend_psx.js
+│   ├── backend_snes.js
+│   ├── backend_nez.js
+│   ├── psx.wasm
+│   ├── snes.wasm
+│   └── nez.wasm
+├── web-public/
+│   ├── wasm/
+│   └── sample-files/
+└── dist/
+    ├── index.html
+    ├── assets/...
+    ├── wasm/...
+    └── sample-files/...
+```
+
+### 5. Dev server
+
+Run the Vite dev server (includes wasm build + asset prep):
+
+```bash
+npm run dev
+```
+
+Then open `http://127.0.0.1:8137/`.
+
+### Useful scripts
+
+```bash
+npm run wasm         # only configure/build CMake runtime artifacts
+npm run preview      # preview the production build
+npm run verify:dist  # assert required runtime files exist in build/dist
+```
+
+### Legacy CMake-only mode (optional)
+
+If you want the old staging behavior (CMake copies `web/` + `sample-files/`
+directly into `build/dist`), configure with:
+
+```bash
+emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=OFF
+cmake --build build
+```
+
+### Previous direct CMake build command
 
 From the repository root:
 
 ```powershell
-emcmake cmake -B build -G Ninja
-cmake --build build
+emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON
+cmake --build build --target player backend_psx backend_snes backend_nez
 ```
-
-This produces everything under `build/dist/`:
-
-```
-build/dist/
-├── index.html                  # UI
-├── app.js
-├── app.css
-├── scriptprocessor_player.js   # generic player (assembled by concat)
-├── backend_psx.js   + psx.wasm   # PSX backend
-├── backend_snes.js  + snes.wasm  # SNES backend
-├── 01 main menu.minipsf
-├── driver.psflib                # PSX dependency, staged next to the minipsf
-└── super james pond - codename robocod.spc
-```
-
-### 4. Serve & run
-
-The page must be served over HTTP (WASM + `fetch` won't work from `file://`):
-
-```powershell
-cd build/dist
-python -m http.server 8137
-# then open http://localhost:8137/
-```
-
-`emrun build/dist/index.html` also works.
 
 ---
 
@@ -128,8 +186,10 @@ flowchart TD
     subgraph BACKENDS["backend_*.js (per-core)"]
         PSXA["PSXBackendAdapter"]
         SNESA["SNESBackendAdapter"]
+      NEZA["NEZBackendAdapter"]
         PSXM["backend_PSX.Module<br/>psx.wasm"]
         SNESM["backend_SNES.Module<br/>snes.wasm"]
+      NEZM["backend_NEZ.Module<br/>nez.wasm"]
     end
 
     APP -->|initialize / loadMusicFromURL| SNP
@@ -137,8 +197,10 @@ flowchart TD
     ADP --> FM
     PSXA -.->|extends| ADP
     SNESA -.->|extends| ADP
+    NEZA -.->|extends| ADP
     PSXA --> PSXM
     SNESA --> SNESM
+    NEZA --> NEZM
 ```
 
 ### How the pieces fit together
@@ -148,19 +210,19 @@ flowchart TD
    the public API (`initialize`, `loadMusicFromURL`, `play/pause`, `getSongInfo`,
    …). It talks to a *backend adapter*.
 
-2. **A backend adapter** (`PSXBackendAdapter`, `SNESBackendAdapter`) is a thin
+2. **A backend adapter** (`PSXBackendAdapter`, `SNESBackendAdapter`,
+  `NEZBackendAdapter`) is a thin
    subclass of `EmsHEAP16BackendAdapter` that knows how to drive one specific
    emulator core through a small, fixed C ABI (the `emu_*` functions — load,
    teardown, compute samples, query track info, etc.).
 
 3. **The emulator core** is the C/C++ source compiled to WebAssembly. Each core
-   is wrapped in an IIFE (`backend_PSX` / `backend_SNES`) so multiple cores can
+  is wrapped in an IIFE (`backend_PSX` / `backend_SNES` / `backend_NEZ`) so multiple cores can
    coexist on the same page without symbol clashes.
 
 ### The `emu_*` ABI
 
-Both cores expose the same exported C functions (PSX adds two extras). This is
-the contract the adapters rely on:
+All cores expose this shared base ABI:
 
 ```
 emu_load_file, emu_teardown,
@@ -170,6 +232,8 @@ emu_get_current_position, emu_seek_position, emu_get_max_position,
 emu_set_subsong, emu_get_track_info,
 malloc, free
 # PSX only: emu_set_bios, emu_set_boost
+# NEZ only: emu_set_loop, emu_number_trace_streams, emu_get_trace_streams,
+#           emu_get_trace_titles, emu_force_mbm_device
 ```
 
 ### Build assembly (CMake)
@@ -181,7 +245,8 @@ shell-pre.js  +  <emscripten-emitted>.js  +  shell-post.js  +  <core>_adapter.js
 ```
 
 - `shell-pre.js` / `shell-post.js` wrap the emitted module in the
-  `backend_PSX` / `backend_SNES` IIFE and provide the async-ready hook.
+  `backend_PSX` / `backend_SNES` / `backend_NEZ` IIFE and provide the async-ready
+  hook.
 - `<core>_adapter.js` is the per-core adapter subclass.
 
 The concatenation is done by [`cmake/concat.cmake`](cmake/concat.cmake), invoked
@@ -198,7 +263,7 @@ defined by the upstream `build.bat` (plain concat, no minify).
 
 ## Adding another backend
 
-If a new core ships in the same shape as `webpsx` / `websnes` — i.e. an
+If a new core ships in the same shape as `webpsx` / `websnes` / `webnez` — i.e. an
 `emscripten/` directory containing `shell-pre.js`, `shell-post.js`, a
 `*_adapter.js`, glue sources, and the `emu_*` ABI — integration is mechanical.
 
@@ -279,6 +344,22 @@ builds and tend to bite when building with a current emsdk:
   mapper can resolve them without a 404 (see the sample-file staging block in
   the root `CMakeLists.txt`).
 
+### webnez quirks (2026-06)
+
+When integrating `webnez` with current emsdk/clang, these extra tweaks were
+required on top of the generic checklist:
+
+- Use compatibility warnings for legacy signatures:
+  `-Wno-incompatible-function-pointer-types`
+  `-Wno-incompatible-pointer-types`
+- Build `Adapter.cpp` with at least C++14 (`CXX_STANDARD 14`) because it relies
+  on the `std::equal(first1,last1,first2,last2,pred)` overload.
+- Allow duplicate legacy globals at link time:
+  `-Wl,--allow-multiple-definition`.
+- Do **not** export `Pointer_stringify` via `EXPORTED_RUNTIME_METHODS` on modern
+  emsdk (it is removed). Keep the JS-side shim:
+  `Module.Pointer_stringify = Module.UTF8ToString`.
+
 ---
 
 ## Project layout
@@ -289,6 +370,7 @@ cmake/concat.cmake          # cross-platform JS concatenation helper
 backends/
   psx/CMakeLists.txt        # PSX backend build
   snes/CMakeLists.txt       # SNES backend build
+  nez/CMakeLists.txt        # NEZ backend build
 web/
   index.html • app.js • app.css
 sample-files/               # demo tracks
@@ -296,6 +378,7 @@ submodules/
   webaudio-player/          # generic engine (untouched)
   webpsx/                   # PSX core (untouched)
   websnes/                  # SNES core (untouched)
+  webnez/                   # NEZ core (untouched)
   emsdk/                    # Emscripten SDK
 ```
 
