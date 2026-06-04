@@ -10,3 +10,6 @@
 [submodule "submodules/webpsx"]
 	path = submodules/webpsx
 	url = https://bitbucket.org/wothke/webpsx.git
+[submodule "submodules/webnez"]
+	path = submodules/webnez
+	url = https://bitbucket.org/wothke/webnez.git
