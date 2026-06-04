@@ -1,0 +1,12 @@
+[submodule "submodules/websnes"]
+	path = submodules/websnes
+	url = https://bitbucket.org/wothke/websnes.git
+[submodule "submodules/emsdk"]
+	path = submodules/emsdk
+	url = https://github.com/emscripten-core/emsdk.git
+[submodule "submodules/webaudio-player"]
+	path = submodules/webaudio-player
+	url = https://bitbucket.org/wothke/webaudio-player.git
+[submodule "submodules/webpsx"]
+	path = submodules/webpsx
+	url = https://bitbucket.org/wothke/webpsx.git
