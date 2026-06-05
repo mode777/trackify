@@ -14,10 +14,6 @@
     window.WASM_SEARCH_PATH = 'wasm/';
 </script>
 <script src="/wasm/scriptprocessor_player.js"></script>
-<script src="/wasm/backend_psx.js"></script>
-<script src="/wasm/backend_snes.js"></script>
-<script src="/wasm/backend_nez.js"></script>
-<script src="/wasm/backend_n64.js"></script>
 </head>
 
 <body>
@@ -33,7 +29,13 @@
         <button id="nextBtn" title="Next">&#9197;</button>
     </div>
 
-    <div id="status" class="status">Loading backends&hellip;</div>
+    <div class="seek" id="seekWrap">
+        <span id="timeCurrent" class="time">0:00</span>
+        <input id="seekBar" type="range" min="0" max="100" value="0" step="100" disabled />
+        <span id="timeTotal" class="time">0:00</span>
+    </div>
+
+    <div id="status" class="status">Loading player&hellip;</div>
 
     <dl id="songInfo" class="song-info"></dl>
 </main>

@@ -14,6 +14,11 @@ Emscripten-compiled emulator cores:
 The UI auto-selects the backend by file extension, decodes audio in WebAssembly,
 and streams it through a `ScriptProcessorNode` pipeline.
 
+Trackify now exposes a timeline seek bar in the UI. Seeking is enabled only when
+the active backend reports valid playback-position support.
+
+Backend scripts are lazy-loaded on first use, so only the selected format runtime is fetched and initialized.
+
 Track metadata is loaded at runtime from `sample-files/index.json` (array of
 `{ title, file }` objects), and audio files are fetched from the same
 `sample-files/` directory.
@@ -177,7 +182,7 @@ cmake --build build --target player backend_psx backend_snes backend_nez backend
 ```mermaid
 flowchart TD
     subgraph UI["web/ (UI)"]
-        APP["app.js<br/>track list • play/pause/next<br/>extension → backend select"]
+      APP["app.js<br/>track list • play/pause/next • seek<br/>extension → backend select"]
     end
 
     subgraph PLAYER["scriptprocessor_player.js (generic engine)"]
@@ -221,7 +226,7 @@ flowchart TD
   `NEZBackendAdapter`, `N64BackendAdapter`) is a thin
    subclass of `EmsHEAP16BackendAdapter` that knows how to drive one specific
    emulator core through a small, fixed C ABI (the `emu_*` functions — load,
-   teardown, compute samples, query track info, etc.).
+   teardown, compute samples, query track info, seek/position, etc.).
 
 3. **The emulator core** is the C/C++ source compiled to WebAssembly. Each core
   is wrapped in an IIFE (`backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64`) so multiple cores can
@@ -243,6 +248,18 @@ malloc, free
 # NEZ only: emu_set_loop, emu_number_trace_streams, emu_get_trace_streams,
 #           emu_get_trace_titles, emu_force_mbm_device
 ```
+
+### Seek behavior by backend
+
+- **PSX / SNES / N64:** seek enabled (`emu_get_current_position`,
+  `emu_seek_position`, `emu_get_max_position` implemented).
+- **NEZ:** seek currently disabled in UI because the NEZ adapter stubs position
+  APIs (`emu_get_current_position` / `emu_get_max_position` return `-1`, and
+  `emu_seek_position` is a no-op).
+
+The UI checks capability at runtime through `ScriptNodePlayer`'s
+`getMaxPlaybackPosition()`: when `<= 0` (or not ready), the seek control stays
+disabled.
 
 ### Build assembly (CMake)
 

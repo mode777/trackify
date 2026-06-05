@@ -93,6 +93,29 @@ h1 {
 .controls button:hover { transform: scale(1.07); }
 .controls button:disabled { opacity: 0.4; cursor: default; transform: none; }
 
+.seek {
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1fr) 3.25rem;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+
+.seek .time {
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.seek input[type='range'] {
+    width: 100%;
+}
+
+.seek.disabled {
+    opacity: 0.55;
+}
+
 .status {
     text-align: center;
     color: var(--muted);
