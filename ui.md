@@ -66,6 +66,7 @@ type TrackifyMessage = {
 ### 3.1 Topic Conventions
 
 - Events:
+  - `playlist-selected`
   - `content.trackSelected`
   - `player.stateChanged`
   - `playlist.finished`
@@ -76,6 +77,38 @@ type TrackifyMessage = {
 - Responses:
   - Same `topic` as request or explicit result topic.
   - Must include `correlationId`.
+
+### 3.2 `playlist-selected` Event (Shell -> Player)
+
+The shell emits this event after loading `sample-files/index.json`.
+
+```ts
+type PlaylistSelectedEventPayload = {
+  playlistId: string;           // Example: 'sample-files-index'
+  source: string;               // Example: 'sample-files/index.json'
+  selectedIndex: number;        // Initial selection, -1 when playlist is empty
+  tracks: Array<{
+    id: string;                 // Shell-assigned stable id, e.g. 'sample-0'
+    title: string;
+    file: string;               // Path relative to sample-files/
+    platform: string;           // e.g. 'psx', 'snes', 'nez', 'n64'
+    game: string;
+    artist: string;
+  }>;
+};
+```
+
+Event envelope example:
+
+```ts
+{
+  type: 'event',
+  topic: 'playlist-selected',
+  source: 'shell',
+  target: 'player',
+  payload: PlaylistSelectedEventPayload,
+}
+```
 
 ## 4. Routing Model
 

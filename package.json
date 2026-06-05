@@ -12,6 +12,7 @@
     "assets:prepare": "node tools/prepare-web-assets.mjs",
     "samples:index": "node tools/generate-sample-index.mjs",
     "dev": "npm run wasm && npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
+    "dev-js": "npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "build": "npm run wasm && npm run assets:prepare && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 8137",
     "verify:dist": "node tools/verify-build-output.mjs"

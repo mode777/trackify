@@ -9,6 +9,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(process.cwd(), 'build/dist'),
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(rootDir, 'index.html'),
+        player: path.resolve(rootDir, 'player.html'),
+      },
+    },
   },
   server: {
     port: 8137,
