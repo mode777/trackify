@@ -10,9 +10,11 @@ const required = [
   'wasm/backend_psx.js',
   'wasm/backend_snes.js',
   'wasm/backend_nez.js',
+  'wasm/backend_n64.js',
   'wasm/psx.wasm',
   'wasm/snes.wasm',
   'wasm/nez.wasm',
+  'wasm/n64.wasm',
 ];
 
 async function main() {

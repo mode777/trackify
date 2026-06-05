@@ -26,6 +26,7 @@ endif()
 
 # ---- Common locations -------------------------------------------------------
 set(SUBMODULES "${CMAKE_SOURCE_DIR}/submodules")
+set(PATCHES "${CMAKE_SOURCE_DIR}/patches")
 set(WEBAUDIO_SRC "${SUBMODULES}/webaudio-player/src")
 set(CONCAT_SCRIPT "${CMAKE_SOURCE_DIR}/cmake/concat.cmake")
 set(SAMPLE_DIR "${CMAKE_SOURCE_DIR}/sample-files")
@@ -85,6 +86,7 @@ add_custom_target(player ALL DEPENDS "${PLAYER_JS}")
 add_subdirectory(backends/psx)
 add_subdirectory(backends/snes)
 add_subdirectory(backends/nez)
+add_subdirectory(backends/n64)
 
 # ---- Stage static UI + sample files into dist/ ------------------------------
 set(_ui_files index.html app.js app.css)

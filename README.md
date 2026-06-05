@@ -9,6 +9,7 @@ Emscripten-compiled emulator cores:
 | **PSX** | [`webpsx`](submodules/webpsx) (HighlyExperimental) | `.psf` / `.minipsf` (+ `.psflib`) | 128 MB |
 | **SNES** | [`websnes`](submodules/websnes) (Game Music Emu) | `.spc` | 64 MB |
 | **NEZ** | [`webnez`](submodules/webnez) (NEZplug++) | `.bgm` / `.opx` / `.nsf` / `.sng` / `.kss` | 64 MB |
+| **N64** | [`webn64`](submodules/webn64) (LazyUSF2/Mupen64plus) | `.usf` / `.miniusf` (+ `.usflib`) | 128 MB |
 
 The UI auto-selects the backend by file extension, decodes audio in WebAssembly,
 and streams it through a `ScriptProcessorNode` pipeline.
@@ -117,9 +118,11 @@ build/
 │   ├── backend_psx.js
 │   ├── backend_snes.js
 │   ├── backend_nez.js
+│   ├── backend_n64.js
 │   ├── psx.wasm
 │   ├── snes.wasm
-│   └── nez.wasm
+│   ├── nez.wasm
+│   └── n64.wasm
 ├── web-public/
 │   ├── wasm/
 │   └── sample-files/
@@ -164,7 +167,7 @@ From the repository root:
 
 ```powershell
 emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON
-cmake --build build --target player backend_psx backend_snes backend_nez
+cmake --build build --target player backend_psx backend_snes backend_nez backend_n64
 ```
 
 ---
@@ -187,9 +190,11 @@ flowchart TD
         PSXA["PSXBackendAdapter"]
         SNESA["SNESBackendAdapter"]
       NEZA["NEZBackendAdapter"]
+      N64A["N64BackendAdapter"]
         PSXM["backend_PSX.Module<br/>psx.wasm"]
         SNESM["backend_SNES.Module<br/>snes.wasm"]
       NEZM["backend_NEZ.Module<br/>nez.wasm"]
+      N64M["backend_N64.Module<br/>n64.wasm"]
     end
 
     APP -->|initialize / loadMusicFromURL| SNP
@@ -198,9 +203,11 @@ flowchart TD
     PSXA -.->|extends| ADP
     SNESA -.->|extends| ADP
     NEZA -.->|extends| ADP
+    N64A -.->|extends| ADP
     PSXA --> PSXM
     SNESA --> SNESM
     NEZA --> NEZM
+    N64A --> N64M
 ```
 
 ### How the pieces fit together
@@ -211,13 +218,13 @@ flowchart TD
    …). It talks to a *backend adapter*.
 
 2. **A backend adapter** (`PSXBackendAdapter`, `SNESBackendAdapter`,
-  `NEZBackendAdapter`) is a thin
+  `NEZBackendAdapter`, `N64BackendAdapter`) is a thin
    subclass of `EmsHEAP16BackendAdapter` that knows how to drive one specific
    emulator core through a small, fixed C ABI (the `emu_*` functions — load,
    teardown, compute samples, query track info, etc.).
 
 3. **The emulator core** is the C/C++ source compiled to WebAssembly. Each core
-  is wrapped in an IIFE (`backend_PSX` / `backend_SNES` / `backend_NEZ`) so multiple cores can
+  is wrapped in an IIFE (`backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64`) so multiple cores can
    coexist on the same page without symbol clashes.
 
 ### The `emu_*` ABI
@@ -232,6 +239,7 @@ emu_get_current_position, emu_seek_position, emu_get_max_position,
 emu_set_subsong, emu_get_track_info,
 malloc, free
 # PSX only: emu_set_bios, emu_set_boost
+# N64 only: emu_set_boost
 # NEZ only: emu_set_loop, emu_number_trace_streams, emu_get_trace_streams,
 #           emu_get_trace_titles, emu_force_mbm_device
 ```
@@ -245,7 +253,7 @@ shell-pre.js  +  <emscripten-emitted>.js  +  shell-post.js  +  <core>_adapter.js
 ```
 
 - `shell-pre.js` / `shell-post.js` wrap the emitted module in the
-  `backend_PSX` / `backend_SNES` / `backend_NEZ` IIFE and provide the async-ready
+  `backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64` IIFE and provide the async-ready
   hook.
 - `<core>_adapter.js` is the per-core adapter subclass.
 
@@ -263,7 +271,7 @@ defined by the upstream `build.bat` (plain concat, no minify).
 
 ## Adding another backend
 
-If a new core ships in the same shape as `webpsx` / `websnes` / `webnez` — i.e. an
+If a new core ships in the same shape as `webpsx` / `websnes` / `webnez` / `webn64` — i.e. an
 `emscripten/` directory containing `shell-pre.js`, `shell-post.js`, a
 `*_adapter.js`, glue sources, and the `emu_*` ABI — integration is mechanical.
 
@@ -360,6 +368,26 @@ required on top of the generic checklist:
   emsdk (it is removed). Keep the JS-side shim:
   `Module.Pointer_stringify = Module.UTF8ToString`.
 
+### webn64 quirks (2026-06)
+
+When integrating `webn64` (LazyUSF2 / Mupen64plus) with current emsdk/clang:
+
+- The emulator is **CPU-intensive** — it uses the N64 cached-interpreter mode
+  (no dynarec/SSE2 in WASM). A large `ScriptProcessor` buffer (0x4000 samples)
+  is used by default in the adapter to compensate.
+- Needs 128 MB initial memory (`-sINITIAL_MEMORY=134217728`) matching the
+  original `TOTAL_MEMORY` flag.
+- Uses `-fno-rtti` (C++ code does not use RTTI).
+- Exception catching is disabled (`-sDISABLE_EXCEPTION_CATCHING=1`).
+- Drop `--closure 1`, `--llvm-lto 1`, `--memory-init-file 0`,
+  `BINARYEN_ASYNC_COMPILATION`, `BINARYEN_TRAP_MODE`, and `SINGLE_FILE` from the
+  original `.bat` — these are obsolete/default in modern emsdk.
+- Do **not** export `Pointer_stringify` via `EXPORTED_RUNTIME_METHODS`. Keep the
+  JS-side shim (`Module.Pointer_stringify = Module.UTF8ToString`) since the
+  adapter still calls it.
+- The `.miniusf` format references `.usflib` sidecar files — ensure they are
+  staged alongside the music files so the runtime file mapper can resolve them.
+
 ---
 
 ## Project layout
@@ -371,6 +399,7 @@ backends/
   psx/CMakeLists.txt        # PSX backend build
   snes/CMakeLists.txt       # SNES backend build
   nez/CMakeLists.txt        # NEZ backend build
+  n64/CMakeLists.txt        # N64 backend build
 web/
   index.html • app.js • app.css
 sample-files/               # demo tracks
@@ -379,6 +408,7 @@ submodules/
   webpsx/                   # PSX core (untouched)
   websnes/                  # SNES core (untouched)
   webnez/                   # NEZ core (untouched)
+  webn64/                   # N64 core (untouched)
   emsdk/                    # Emscripten SDK
 ```
 

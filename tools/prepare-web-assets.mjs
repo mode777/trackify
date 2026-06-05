@@ -13,9 +13,11 @@ const requiredRuntimeFiles = [
   'backend_psx.js',
   'backend_snes.js',
   'backend_nez.js',
+  'backend_n64.js',
   'psx.wasm',
   'snes.wasm',
   'nez.wasm',
+  'n64.wasm',
 ];
 
 async function ensureRuntimeArtifacts() {

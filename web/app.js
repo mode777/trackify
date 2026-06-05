@@ -12,6 +12,7 @@ const SAMPLE_BASE_PATH = 'sample-files/';
 const EXT_PSX = ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'];
 const EXT_SNES = ['spc', 'rsn'];
 const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
+const EXT_N64 = ['usf', 'miniusf', 'usflib'];
 const runtime = globalThis;
 
 let currentIndex = -1;
@@ -33,6 +34,7 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
+    if (EXT_N64.includes(ext)) return 'n64';
     if (EXT_NEZ.includes(ext)) return 'nez';
     if (EXT_SNES.includes(ext)) return 'snes';
     if (EXT_PSX.includes(ext)) return 'psx';
@@ -55,6 +57,16 @@ function makeAdapter(type) {
         (typeof SNESBackendAdapter !== 'undefined' ? SNESBackendAdapter : null);
     const NEZAdapterCtor = runtime.NEZBackendAdapter ||
         (typeof NEZBackendAdapter !== 'undefined' ? NEZBackendAdapter : null);
+    const N64AdapterCtor = runtime.N64BackendAdapter ||
+        (typeof N64BackendAdapter !== 'undefined' ? N64BackendAdapter : null);
+
+    if (type === 'n64') {
+        if (!N64AdapterCtor) {
+            throw new Error('N64 backend adapter is not available');
+        }
+        installPointerStringifyShim(runtime.backend_N64);
+        return new N64AdapterCtor();
+    }
 
     if (type === 'nez') {
         if (!NEZAdapterCtor) {
