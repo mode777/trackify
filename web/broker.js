@@ -106,6 +106,75 @@ class TrackifyBroker {
         this.onMessage = this.onMessage.bind(this);
     }
 
+    describeSourceFrame(eventSource, messageSource) {
+        if (this.mode === 'frame') {
+            if (eventSource === this.parentWindow) {
+                return 'parent(shell)';
+            }
+            return messageSource || 'unknown';
+        }
+
+        for (const [serviceId, service] of this.services.entries()) {
+            if (service && service.windowRef === eventSource) {
+                return serviceId;
+            }
+        }
+
+        return messageSource || 'unknown';
+    }
+
+    describeTargetFrame(target, targetWindow) {
+        if (this.mode === 'frame') {
+            if (targetWindow === this.parentWindow || target === 'shell') {
+                return 'parent(shell)';
+            }
+            return target || 'unknown';
+        }
+
+        if (target && target !== '*' && target !== 'shell') {
+            return target;
+        }
+
+        for (const [serviceId, service] of this.services.entries()) {
+            if (service && service.windowRef === targetWindow) {
+                return serviceId;
+            }
+        }
+
+        return target || 'unknown';
+    }
+
+    logIncomingMessage(event, message) {
+        const fromFrame = this.describeSourceFrame(event && event.source, message.source);
+        console.info('[TrackifyBroker][recv]', {
+            mode: this.mode,
+            id: message.id,
+            type: message.type,
+            topic: message.topic,
+            sourceService: message.source,
+            fromFrame,
+            eventOrigin: event && event.origin ? event.origin : 'unknown',
+            target: message.target,
+            correlationId: message.correlationId || null,
+        });
+    }
+
+    logOutgoingMessage(message, targetWindow, targetOrigin) {
+        const toFrame = this.describeTargetFrame(message.target, targetWindow);
+        console.info('[TrackifyBroker][send]', {
+            mode: this.mode,
+            id: message.id,
+            type: message.type,
+            topic: message.topic,
+            sourceService: message.source,
+            fromFrame: this.serviceId,
+            target: message.target,
+            toFrame,
+            targetOrigin,
+            correlationId: message.correlationId || null,
+        });
+    }
+
     start() {
         if (this.started) return;
         globalThis.addEventListener('message', this.onMessage);
@@ -291,6 +360,7 @@ class TrackifyBroker {
                 throw new Error('Cannot resolve target window for message topic: ' + message.topic);
             }
             const targetOrigin = this.resolveTargetOrigin(message.target);
+            this.logOutgoingMessage(message, resolvedTargetWindow, targetOrigin);
             resolvedTargetWindow.postMessage(message, targetOrigin);
             return;
         }
@@ -298,6 +368,7 @@ class TrackifyBroker {
         if (!this.parentWindow || this.parentWindow === globalThis) {
             throw new Error('Frame broker requires a parent window');
         }
+        this.logOutgoingMessage(message, this.parentWindow, this.targetOrigin);
         this.parentWindow.postMessage(message, this.targetOrigin);
     }
 
@@ -321,6 +392,8 @@ class TrackifyBroker {
         const message = event.data;
 
         if (!isValidBaseEnvelope(message)) return;
+
+        this.logIncomingMessage(event, message);
 
         if (this.hasSeenMessage(message.id)) return;
         this.markMessageSeen(message.id);
