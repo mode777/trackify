@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nobuo Uematsu | Trackify</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-container": "#7c3aed",
+                      "surface-variant": "#2d3449",
+                      "on-secondary-fixed": "#001f26",
+                      "outline-variant": "#4a4455",
+                      "on-background": "#dae2fd",
+                      "surface-bright": "#31394d",
+                      "on-secondary": "#003640",
+                      "secondary-container": "#03b5d3",
+                      "secondary-fixed": "#acedff",
+                      "background": "#0b1326",
+                      "on-surface": "#dae2fd",
+                      "secondary": "#4cd7f6",
+                      "on-tertiary-fixed": "#40000d",
+                      "surface-container-highest": "#2d3449",
+                      "on-tertiary": "#67001b",
+                      "on-secondary-container": "#00424e",
+                      "on-error": "#690005",
+                      "inverse-surface": "#dae2fd",
+                      "secondary-fixed-dim": "#4cd7f6",
+                      "inverse-on-surface": "#283044",
+                      "on-primary-container": "#ede0ff",
+                      "surface-container-lowest": "#060e20",
+                      "surface-tint": "#d2bbff",
+                      "on-error-container": "#ffdad6",
+                      "on-surface-variant": "#ccc3d8",
+                      "tertiary-fixed-dim": "#ffb2b7",
+                      "on-primary-fixed-variant": "#5a00c6",
+                      "primary-fixed": "#eaddff",
+                      "outline": "#958da1",
+                      "surface-container-low": "#131b2e",
+                      "surface": "#0b1326",
+                      "tertiary-fixed": "#ffdadb",
+                      "tertiary-container": "#c81a42",
+                      "primary-fixed-dim": "#d2bbff",
+                      "on-tertiary-fixed-variant": "#92002a",
+                      "error-container": "#93000a",
+                      "on-primary": "#3f008e",
+                      "surface-container-high": "#222a3d",
+                      "on-primary-fixed": "#25005a",
+                      "primary": "#d2bbff",
+                      "inverse-primary": "#732ee4",
+                      "on-secondary-fixed-variant": "#004e5c",
+                      "surface-dim": "#0b1326",
+                      "tertiary": "#ffb2b7",
+                      "on-tertiary-container": "#ffdedf",
+                      "error": "#ffb4ab",
+                      "surface-container": "#171f33"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter-desktop": "24px",
+                      "gutter-mobile": "16px",
+                      "unit": "8px",
+                      "margin-page": "40px",
+                      "margin-mobile": "20px",
+                      "max-width": "1440px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Montserrat"],
+                      "body-lg": ["Inter"],
+                      "headline-lg-mobile": ["Montserrat"],
+                      "headline-xl": ["Montserrat"],
+                      "label-md": ["Geist"],
+                      "headline-md": ["Montserrat"],
+                      "body-md": ["Inter"],
+                      "label-sm": ["Geist"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(11, 19, 38, 0.7);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .neon-glow-purple:hover {
+            box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+            border-color: #7c3aed;
+        }
+        .active-track-glow {
+            box-shadow: 0 0 8px rgba(210, 187, 255, 0.3);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0b1326;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #2d3449;
+            border-radius: 10px;
+        }
+        .hero-gradient {
+            background: linear-gradient(to bottom, transparent, #0b1326);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md custom-scrollbar">
+<!-- SideNavBar -->
+<aside class="fixed h-full w-[240px] left-0 top-0 bg-surface-container-low dark:bg-surface-container-low backdrop-blur-xl border-r border-white/10 flex flex-col py-8 px-6 z-40 hidden md:flex">
+<div class="mb-10">
+<h1 class="font-headline-xl text-headline-xl font-extrabold text-primary-container dark:text-primary tracking-tighter">Trackify</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant opacity-60">Cyber-Orchestra Edition</p>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 font-label-md text-label-md text-primary font-medium hover:bg-white/5 transition-colors p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span> Home
+            </a>
+<a class="flex items-center gap-3 font-label-md text-label-md text-on-surface-variant font-medium hover:bg-white/5 transition-colors p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="devices">devices</span> Platforms
+            </a>
+<a class="flex items-center gap-3 font-label-md text-label-md text-on-surface-variant font-medium hover:bg-white/5 transition-colors p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span> Composers
+            </a>
+<a class="flex items-center gap-3 font-label-md text-label-md text-on-surface-variant font-medium hover:bg-white/5 transition-colors p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="library_music">library_music</span> Your Library
+            </a>
+<button class="w-full mt-6 bg-primary-container text-on-primary-container py-3 rounded-full font-label-md text-label-md font-bold transition-transform active:scale-95 shadow-lg shadow-primary-container/20">
+                Create Playlist
+            </button>
+</nav>
+<div class="mt-auto space-y-2">
+<a class="flex items-center gap-3 font-label-md text-label-md text-on-surface-variant font-medium hover:bg-white/5 transition-colors p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="download">download</span> Downloads
+            </a>
+<a class="flex items-center gap-3 font-label-md text-label-md text-on-surface-variant font-medium hover:bg-white/5 transition-colors p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span> Settings
+            </a>
+</div>
+</aside>
+<!-- TopAppBar -->
+<header class="flex justify-between items-center md:ml-[240px] h-16 px-gutter-desktop fixed top-0 right-0 left-0 md:left-auto bg-background/80 backdrop-blur-md z-30 border-b border-white/5">
+<div class="flex items-center gap-4 flex-1">
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant hover:text-white transition-colors opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-xl">chevron_right</span>
+</button>
+</div>
+<div class="relative w-full max-w-md group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-high border border-outline-variant rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Search soundtracks, composers..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4 ml-6">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors hover:bg-white/5 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full"></span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-white/10 cursor-pointer group">
+<img alt="User profile" class="w-8 h-8 rounded-full border border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC73z_oiN1GPq7mUtU6B_c6o3zIG1zEYWYL7LtNNwZbL2mUQiwgkTSZ3ITpnntppN0Lx9pgOE2Ci8TdGPI5SjIviJQaGKt8X1tf-SCB_ivOQ2vVZr4n-4OaT1lX3cQVy_eOpwdxs9MbNGHaeNT7VEuiKRjtCRPR-8-gRK8IknaHlzp--kf1whW6t_xLN7LLuAxQFt699GXDj-5if1_fy-m35T3lWrrqVJ6pQ9OLQuN_anAauyJ1kX4DZ1HKtusxtP83aZdt-pMF1iuJ"/>
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors hidden lg:block">Alexander V.</span>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="md:ml-[240px] pt-16 pb-[120px] min-h-screen">
+<!-- Hero Section -->
+<section class="relative w-full h-[500px] flex items-end overflow-hidden">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover" data-alt="Nobuo Uematsu portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBXG9xMSkXzSK-pAxE-u_rMxxTP6BejLbCe_-f-aMAqoTkEGgdXCnKDG4d0-e-Xd9AliBGv3xL0mp1LdssQwproGI1kAYAD24lZ-tuwjbdPPUuZmEa6FJrKieYdLOb8S-ENQmI9iFNljSgWyMR5CRybsSHw7d72pFrLe4LLbwOH3DQocEGOUCYaUJdnLab_irOhxgvQaUAzqnIV92E4MoWoIJiLKGcejNeZhpCSjlM8vw76SxOW1IoH_budWbHfFVrPaGk2kVi5FlhK"/>
+<div class="absolute inset-0 hero-gradient"></div>
+<div class="absolute inset-0 bg-primary-container/10 mix-blend-overlay"></div>
+</div>
+<div class="relative z-10 px-gutter-desktop pb-12 w-full flex flex-col md:flex-row items-end justify-between gap-8">
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-4">
+<span class="px-3 py-1 bg-primary text-on-primary font-label-sm text-label-sm rounded-full tracking-widest uppercase">Legendary Composer</span>
+<div class="flex gap-1 text-secondary">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-white mb-4 leading-none">Nobuo Uematsu</h1>
+<p class="max-w-2xl font-body-lg text-body-lg text-on-surface-variant leading-relaxed">
+                        The "Beethoven of Video Game Music." Known for his emotive scores that defined the Final Fantasy series and helped elevate game soundtracks to a premium art form globally.
+                    </p>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary hover:bg-primary-fixed-dim text-on-primary px-8 py-4 rounded-full font-label-md text-label-md font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person_add</span> Follow
+                    </button>
+<div class="flex gap-2">
+<a class="w-12 h-12 flex items-center justify-center rounded-full border border-outline-variant hover:border-primary hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</a>
+<a class="w-12 h-12 flex items-center justify-center rounded-full border border-outline-variant hover:border-primary hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<div class="px-gutter-desktop py-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
+<!-- Top Tracks Column -->
+<div class="lg:col-span-2">
+<div class="flex items-center justify-between mb-8">
+<h2 class="font-headline-lg text-headline-lg text-white">Top Tracks</h2>
+<button class="text-primary font-label-md text-label-md hover:underline">Show all</button>
+</div>
+<div class="space-y-1">
+<!-- Track 1 -->
+<div class="group flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-all cursor-pointer">
+<div class="flex items-center gap-4">
+<span class="w-4 text-on-surface-variant font-label-md group-hover:hidden">1</span>
+<span class="w-4 text-primary material-symbols-outlined hidden group-hover:block" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<img class="w-12 h-12 rounded object-cover" data-alt="One-Winged Angel album art" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDPW5gkEvlZZZ-Mph8EnBtBWDrk_3_NUysT1JixhJWb-kv1QAABi_OMjX-nVNNN1T3uTFolsfqlUY-RB8QoOni5JbEdoQwhCZkVyjqZj-TWdIDG41ZP_8Nw5MBtr_uiNZcr9WLtDes0fcGqLb8XKnfXwMr2BCBgCFibWnlLu5eFyP-JyU-TQtFBc3iWqdCUcvZScbdCZQr4aDAquNkhoDTWCgckLaMDypxfIc_8qHPyiTsP7rGxWha3Ug3FjL_Ye7iutyuxgHrb-_dj"/>
+<div>
+<p class="text-white font-headline-md text-headline-md leading-none mb-1">One-Winged Angel</p>
+<p class="text-on-surface-variant text-label-sm">Final Fantasy VII</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden md:block text-on-surface-variant text-label-sm">124,502,331 plays</span>
+<span class="text-on-surface-variant text-label-sm">7:19</span>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-primary" data-icon="favorite">favorite</span>
+</button>
+</div>
+</div>
+<!-- Track 2 -->
+<div class="group flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-all cursor-pointer active-track-glow bg-white/5 border-l-2 border-primary">
+<div class="flex items-center gap-4">
+<span class="w-4 text-primary material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+<img class="w-12 h-12 rounded object-cover" data-alt="To Zanarkand album art" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBTWK5tYJCYD3KuwZIzIbe0UCCCkeuEpBHb6EWVWvvqKCPB36tgoT5TDBGGiScOcoW0uCsG2C0rNIkNHOjeGK8S5tadlv8djEdUqs3aulihzPCaqdzmdfVa_eFF4Nx069pYIsdRh_DKf1MEBzIQXcysG5VMKKzuRzbOvrEbL_p-IOSGd7Xrm5vSy-htqQoKGf8xUNtJe0HxCYaShMxR7y1Ym5HC7pJSd2_S6a7XWzc4h5HjYY4cVShRBe-G9eqDk5X695r_OJUGX5R"/>
+<div>
+<p class="text-primary font-headline-md text-headline-md leading-none mb-1">To Zanarkand</p>
+<p class="text-on-surface-variant text-label-sm">Final Fantasy X</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden md:block text-on-surface-variant text-label-sm">98,122,045 plays</span>
+<span class="text-on-surface-variant text-label-sm">3:04</span>
+<button class="opacity-100">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+</div>
+<!-- Track 3 -->
+<div class="group flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-all cursor-pointer">
+<div class="flex items-center gap-4">
+<span class="w-4 text-on-surface-variant font-label-md group-hover:hidden">3</span>
+<span class="w-4 text-primary material-symbols-outlined hidden group-hover:block" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<img class="w-12 h-12 rounded object-cover" data-alt="Terra's Theme album art" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXLLAxPIwmLmnFUidYnChEmGENipLmiXSGLMY4rtkaaSQnFwp8X7DP6hI1wcRC5fsuZ0tM3gYQdaDGHHprH1rLju7sg9yTsgc6UOi1_gLRTLrg6WVd3htFtZb76crO8BW-GD7KDMQ8fQF5PWlvaNjeHSNT3v_nFBdqAPRAjYvFWQJ4LDTzKZfxYGXiWNSGUc8oiB0FGoqTTuj0eSWHJewfRbvR7O4aB4lD96SowoC1zfQNqNLiJIEFk7teO0-dJMx41hVxYbquVpDi"/>
+<div>
+<p class="text-white font-headline-md text-headline-md leading-none mb-1">Terra's Theme</p>
+<p class="text-on-surface-variant text-label-sm">Final Fantasy VI</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden md:block text-on-surface-variant text-label-sm">45,667,109 plays</span>
+<span class="text-on-surface-variant text-label-sm">3:50</span>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined" data-icon="favorite">favorite</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Social/Bio Column -->
+<div class="space-y-8">
+<div>
+<h3 class="font-headline-md text-headline-md text-white mb-4">About</h3>
+<div class="bg-surface-container-low p-6 rounded-2xl border border-white/5">
+<p class="text-on-surface-variant text-body-md mb-6 line-clamp-4">
+                            A self-taught musician, Uematsu began playing the piano at the age of twelve. He joined Square in 1986, where he first met Hironobu Sakaguchi. He has since composed scores for over 30 titles...
+                        </p>
+<div class="flex gap-4">
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path></svg>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.84 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"></path></svg>
+</a>
+</div>
+</div>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-white mb-4">Eras Mastered</h3>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 bg-purple-900/30 text-primary border border-primary/20 rounded font-label-sm text-label-sm">8-BIT</span>
+<span class="px-3 py-1 bg-cyan-900/30 text-secondary border border-secondary/20 rounded font-label-sm text-label-sm">16-BIT</span>
+<span class="px-3 py-1 bg-rose-900/30 text-tertiary border border-tertiary/20 rounded font-label-sm text-label-sm">ORCHESTRAL</span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface-variant border border-outline-variant rounded font-label-sm text-label-sm">CHIPTUNE</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Games Grid -->
+<section class="px-gutter-desktop py-8">
+<h2 class="font-headline-lg text-headline-lg text-white mb-8">Games Scored by Nobuo</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-gutter-desktop">
+<!-- Game Card 1 -->
+<div class="group cursor-pointer">
+<div class="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative neon-glow-purple border border-transparent transition-all">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Final Fantasy VII" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9Nm9-g_e-dNeAw1H19TwtJPeWdgjaJ4PenHJtIGc77rO6sEcl92s8IFXk6Y_q_HBIIHugJyBWC-zt9JmS7zOxJ4qu40jclGWZk07GewC2TD7y2h5kXo3BnnKFJTiD_h3qCNkUsegmD69pZXoswQVBuSE5p7c2t4jD3rVa2pusDNEGYjM3Ix7D5N1vBCVIcY6RZHgZN3Be8GyIXRgi4k_eNGqMfdQITSvLRVat3LhjGI028tROUxY2RCjO0XjsTvwbifqu0OazG5ZM"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+<button class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-on-primary shadow-xl">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h4 class="text-white font-headline-md text-headline-md mb-1 truncate">Final Fantasy VII</h4>
+<p class="text-on-surface-variant text-label-sm uppercase tracking-wider">1997 • Square</p>
+</div>
+<!-- Game Card 2 -->
+<div class="group cursor-pointer">
+<div class="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative neon-glow-purple border border-transparent transition-all">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Chrono Trigger" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBkevYX8LCVLFPBuemqZDNmBij009h0-cZGE1lyufCTF3ZjJrOfJIppsXfxAPnuCEniPhOkwcsI3nIfyv_wwkjRjepYeEVKnoOALqUXeK62dz7Hv-bKqL29WD10OR-CPeLwqYuAjHZeSsuaESc3BNnbk0xtw1w--qHSWbUe-pjXVX21zUa846iVB3mSftMNZ17jOMq2nC-wppdAVuk63l9QTn_ETpYE0v3pzOl86sRuDbhuI8ERJkLQCy0cOUE8tOzCWR4zxEQkVtH"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+<button class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-on-primary shadow-xl">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h4 class="text-white font-headline-md text-headline-md mb-1 truncate">Chrono Trigger</h4>
+<p class="text-on-surface-variant text-label-sm uppercase tracking-wider">1995 • Square</p>
+</div>
+<!-- Game Card 3 -->
+<div class="group cursor-pointer">
+<div class="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative neon-glow-purple border border-transparent transition-all">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Final Fantasy VI" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNpmrrclPx7C14oHgbCs_ZiZUBY1nrZT2xZRdqshzzbUWX9ZbEfAOQcViFFT3ZKz25k-NBZbTSY5neJtXS0TKxYx3g_6Q_5YhU1III5wLc7S9sXCU2RWy2FGfGPTtWhVv4N7090-H5X3tOYrAU1__FnET4eFjYIKSPOdk_k4M-YTUsslYzSK5Cc7oSg3YTzBL4Ur7zX6P_xFRoPuqUOVJMtHlgs_8Xk4PeXV8FPKlG_w48Xt6eSZDaQ4Yv3f0y0JL23smQG9pvK6Ic"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+<button class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-on-primary shadow-xl">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h4 class="text-white font-headline-md text-headline-md mb-1 truncate">Final Fantasy VI</h4>
+<p class="text-on-surface-variant text-label-sm uppercase tracking-wider">1994 • Square</p>
+</div>
+<!-- Game Card 4 -->
+<div class="group cursor-pointer">
+<div class="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative neon-glow-purple border border-transparent transition-all">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Lost Odyssey" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAab0-SZut4etIWYwRe20o6wpff5yVbTZW8Hrrr1FE7rAp-3segCRIQG8hUv1RM0VdvJihS4GxR3KyYKm4FPBg5MmfSlGnsjVmLugz7WJdiMswjkmpGcPeM9qmm8eRTh_vVCL2XghQWcGRtjdEWIFmJAYjykILBDClPsROzod0SK_mT8fIyZweg-jvQLP-q3-elVrGw4Dyk7rQ3hvhXukLyg838UGxVxRHeUMC5O5FSf67_9rRGPkcls7Mmb20f6lcZ63ZnVG4hM1JX"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+<button class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-on-primary shadow-xl">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h4 class="text-white font-headline-md text-headline-md mb-1 truncate">Lost Odyssey</h4>
+<p class="text-on-surface-variant text-label-sm uppercase tracking-wider">2007 • Mistwalker</p>
+</div>
+<!-- Game Card 5 -->
+<div class="group cursor-pointer">
+<div class="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative neon-glow-purple border border-transparent transition-all">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Blue Dragon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwXllWPUlVQIEQnARGWBzigJ7zypbO1VaPD47-xyOCOek-bUXt_F45IiC6jVgaaXGev4ILgVqo6_mX2MWHXob75DOU6xeJGsRnnJYppFQTJxqqxtYWYHOBvrbzO4pZtG1EZxqMk1ign5batxvTIBx8jDgYrC14-8DZeMrPybJOARzhCmj3wypX8cOgUpFNTapAKANlmMy14uYWg8S0U1kzygQg4qfQDG2i6PWczKpZV7xtp8QweUStP8BJfACnpjLPtQulEqzoqqhU"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+<button class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-on-primary shadow-xl">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h4 class="text-white font-headline-md text-headline-md mb-1 truncate">Blue Dragon</h4>
+<p class="text-on-surface-variant text-label-sm uppercase tracking-wider">2006 • Mistwalker</p>
+</div>
+</div>
+</section>
+</main>
+<!-- Now Playing Footer -->
+<footer class="fixed bottom-0 left-0 w-full h-[90px] z-50 glass-panel shadow-2xl flex items-center justify-between px-gutter-desktop w-full border-t border-white/10">
+<!-- Track Info -->
+<div class="flex items-center gap-4 w-1/3">
+<img class="w-14 h-14 rounded shadow-lg" data-alt="Currently playing" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAONHH_Y0peXzXdU8QhuIMuW8ZNnfFbLd-MZnJvsp98KYOKwvld1FZlhOutT5bpG4Pu2AD05AmeEtJ8_LpRbeuQmHG36V1Rg69YhSUKOw91SuSO1Cl6YUiQ2ga_su5AxcWR6c2YFa8JYTmJtZZVTT3NqVzXYX6rQFANJEIAJjGlzTDvdqvZDdvP_Az0YU6NDtVgNUOQD4Y0ENwlH3Uf1LXy_d455yC65eK4BufJ4CONA8psiJ0TSl09PD3zcZZjt96i4o-VWmFBEpiZ"/>
+<div>
+<p class="text-white font-label-md text-label-md font-bold mb-0.5">To Zanarkand</p>
+<p class="text-on-surface-variant text-label-sm">Nobuo Uematsu</p>
+</div>
+<button class="ml-2 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<!-- Player Controls -->
+<div class="flex flex-col items-center w-1/3 gap-1">
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">shuffle</span>
+</button>
+<button class="text-white hover:text-primary transition-colors">
+<span class="material-symbols-outlined">skip_previous</span>
+</button>
+<button class="w-10 h-10 bg-white text-background rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<button class="text-white hover:text-primary transition-colors">
+<span class="material-symbols-outlined">skip_next</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">repeat</span>
+</button>
+</div>
+<div class="flex items-center gap-3 w-full max-w-md">
+<span class="text-label-sm text-on-surface-variant w-8">1:24</span>
+<div class="flex-1 h-1 bg-white/10 rounded-full relative group cursor-pointer">
+<div class="absolute left-0 top-0 h-full bg-primary w-[40%] rounded-full shadow-[0_0_8px_#7c3aed]"></div>
+<div class="absolute left-[40%] top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-lg"></div>
+</div>
+<span class="text-label-sm text-on-surface-variant w-8">3:04</span>
+</div>
+</div>
+<!-- Volume/Extras -->
+<div class="flex items-center justify-end gap-4 w-1/3">
+<button class="text-on-surface-variant hover:text-white">
+<span class="material-symbols-outlined">lyrics</span>
+</button>
+<button class="text-on-surface-variant hover:text-white">
+<span class="material-symbols-outlined">queue_music</span>
+</button>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant">volume_up</span>
+<div class="w-24 h-1 bg-white/10 rounded-full">
+<div class="h-full bg-on-surface-variant w-2/3 rounded-full"></div>
+</div>
+</div>
+</div>
+</footer>
+<!-- Mobile Nav -->
+<div class="md:hidden fixed bottom-[90px] left-0 right-0 h-16 glass-panel border-t border-white/5 flex items-center justify-around z-40">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">search</span>
+<span class="text-[10px]">Search</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">library_music</span>
+<span class="text-[10px]">Library</span>
+</a>
+</div>
+</body></html>

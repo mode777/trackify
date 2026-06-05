@@ -36,12 +36,50 @@ const els = {
     play: document.getElementById('playBtn'),
     next: document.getElementById('nextBtn'),
     status: document.getElementById('status'),
-    info: document.getElementById('songInfo'),
+    trackTitle: document.getElementById('currentTrackTitle'),
+    trackMeta: document.getElementById('currentTrackMeta'),
     seekWrap: document.getElementById('seekWrap'),
     seekBar: document.getElementById('seekBar'),
+    volumeBar: document.getElementById('volumeBar'),
     timeCurrent: document.getElementById('timeCurrent'),
     timeTotal: document.getElementById('timeTotal'),
 };
+
+const PLACEHOLDER_GAME = 'Unknown game';
+
+function normalizeInfoMap(info) {
+    const normalized = {};
+    if (!info || typeof info !== 'object') return normalized;
+
+    for (const [key, value] of Object.entries(info)) {
+        normalized[String(key).toLowerCase()] = value;
+    }
+    return normalized;
+}
+
+function firstInfoValue(infoMap, keys) {
+    for (const key of keys) {
+        const value = infoMap[key];
+        if (value === undefined || value === null || value === '') continue;
+        return String(value);
+    }
+    return null;
+}
+
+function updateNowPlayingMeta(track, songInfo) {
+    const infoMap = normalizeInfoMap(songInfo);
+
+    const title = firstInfoValue(infoMap, ['title', 'song', 'track', 'name']) || (track ? track.title : 'No track selected');
+    const game = firstInfoValue(infoMap, ['game', 'album', 'source', 'system']) || 'Unknown game';
+
+    if (els.trackTitle) {
+        els.trackTitle.textContent = title;
+    }
+    if (els.trackMeta) {
+        const typeLabel = track ? (typeOf(track.file) || '?').toUpperCase() : '?';
+        els.trackMeta.textContent = game + ' - ' + typeLabel;
+    }
+}
 
 function formatMs(ms) {
     if (!Number.isFinite(ms) || ms < 0) return '0:00';
@@ -62,6 +100,48 @@ function setSeekUiEnabled(enabled) {
     els.seekWrap.classList.toggle('disabled', !enabled);
 }
 
+function updateSeekBarFill() {
+    const max = Number(els.seekBar.max) || 1;
+    const value = Number(els.seekBar.value) || 0;
+    const pct = Math.max(0, Math.min(100, (value / max) * 100));
+    els.seekBar.style.setProperty('--seek-progress', pct + '%');
+}
+
+function updateVolumeBarFill() {
+    if (!els.volumeBar) return;
+
+    const max = Number(els.volumeBar.max) || 100;
+    const value = Number(els.volumeBar.value) || 0;
+    const pct = Math.max(0, Math.min(100, (value / max) * 100));
+    els.volumeBar.style.setProperty('--volume-progress', pct + '%');
+}
+
+function applyVolumeFromSlider() {
+    if (!els.volumeBar) return;
+
+    const value = Number(els.volumeBar.value);
+    if (!Number.isFinite(value)) return;
+
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player) return;
+
+    player.setVolume(Math.max(0, Math.min(100, value)) / 100);
+}
+
+function syncVolumeUiFromPlayer() {
+    if (!els.volumeBar) return;
+
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player) return;
+
+    const volume = player.getVolume();
+    if (!Number.isFinite(volume)) return;
+
+    const clamped = Math.max(0, Math.min(1, volume));
+    els.volumeBar.value = String(Math.round(clamped * 100));
+    updateVolumeBarFill();
+}
+
 function resetSeekUi() {
     seekDragging = false;
     seekMaxMs = 0;
@@ -69,6 +149,7 @@ function resetSeekUi() {
     els.seekBar.value = '0';
     els.timeCurrent.textContent = '0:00';
     els.timeTotal.textContent = '0:00';
+    updateSeekBarFill();
     setSeekUiEnabled(false);
 }
 
@@ -114,6 +195,7 @@ function refreshSeekUi() {
 
     const clampedPosition = Math.max(0, Math.min(seekMaxMs, Math.floor(positionMs)));
     els.seekBar.value = String(clampedPosition);
+    updateSeekBarFill();
     els.timeCurrent.textContent = formatMs(clampedPosition);
 }
 
@@ -262,7 +344,11 @@ function parseTracksManifest(data) {
 
     return entries
         .filter((entry) => entry && typeof entry.title === 'string' && typeof entry.file === 'string')
-        .map((entry) => ({ title: entry.title, file: entry.file }));
+        .map((entry) => ({
+            title: entry.title,
+            file: entry.file,
+            game: typeof entry.game === 'string' ? entry.game.trim() : '',
+        }));
 }
 
 async function loadTracks() {
@@ -279,44 +365,50 @@ function renderTracks() {
         li.dataset.index = String(i);
         if (i === currentIndex) li.classList.add('active');
 
+        const number = document.createElement('span');
+        number.className = 'track-number';
+        number.textContent = String(i + 1);
+
+        const main = document.createElement('div');
+        main.className = 'track-main';
+
         const name = document.createElement('span');
+        name.className = 'track-name';
         name.textContent = t.title;
+
+        const game = document.createElement('span');
+        game.className = 'track-artist';
+        game.textContent = t.game || PLACEHOLDER_GAME;
+
+        main.append(name, game);
 
         const badge = document.createElement('span');
         badge.className = 'badge';
         badge.textContent = typeOf(t.file) || '?';
 
-        li.append(name, badge);
+        li.append(number, main, badge);
         li.addEventListener('click', () => selectTrack(i, true));
         els.list.appendChild(li);
     });
 }
 
-function renderSongInfo() {
-    els.info.innerHTML = '';
+function readSongInfo() {
     const player = runtime.ScriptNodePlayer.getInstance();
-    if (!player) return;
+    if (!player) return null;
 
     let info;
-    try { info = player.getSongInfo(); } catch (e) { return; }
-    if (!info) return;
+    try { info = player.getSongInfo(); } catch (e) { return null; }
+    if (!info) return null;
 
-    for (const key of Object.keys(info)) {
-        const value = info[key];
-        if (value === undefined || value === null || value === '') continue;
-
-        const dt = document.createElement('dt');
-        dt.textContent = key;
-        const dd = document.createElement('dd');
-        dd.textContent = String(value);
-        els.info.append(dt, dd);
-    }
+    return info;
 }
 
 function updatePlayButton() {
     const player = runtime.ScriptNodePlayer.getInstance();
     const paused = !player || player.isPaused();
-    els.play.innerHTML = paused ? '&#9654;' : '&#10074;&#10074;';
+    els.play.innerHTML = paused
+        ? '<span class="material-symbols-outlined filled">play_arrow</span>'
+        : '<span class="material-symbols-outlined filled">pause</span>';
 }
 
 async function selectTrack(index, autoplay) {
@@ -334,7 +426,7 @@ async function selectTrack(index, autoplay) {
     } else {
         setStatus('Loading "' + track.title + '"\u2026');
     }
-    els.info.innerHTML = '';
+    updateNowPlayingMeta(track, null);
     resetSeekUi();
 
     try {
@@ -348,8 +440,10 @@ async function selectTrack(index, autoplay) {
         await runtime.ScriptNodePlayer.initialize(adapter, onTrackEnd, [], false);
         await runtime.ScriptNodePlayer.loadMusicFromURL(SAMPLE_BASE_PATH + track.file, {});
 
-        renderSongInfo();
-    refreshSeekUi();
+        const songInfo = readSongInfo();
+        updateNowPlayingMeta(track, songInfo);
+        syncVolumeUiFromPlayer();
+        refreshSeekUi();
         const player = runtime.ScriptNodePlayer.getInstance();
         if (autoplay && player) player.play();
         updatePlayButton();
@@ -396,6 +490,7 @@ function init() {
         if (els.seekBar.disabled) return;
         seekDragging = true;
         const pendingMs = Number(els.seekBar.value);
+        updateSeekBarFill();
         els.timeCurrent.textContent = formatMs(pendingMs);
     });
     els.seekBar.addEventListener('change', () => {
@@ -422,6 +517,15 @@ function init() {
             refreshSeekUi();
         }
     });
+
+    if (els.volumeBar) {
+        updateVolumeBarFill();
+        els.volumeBar.addEventListener('input', () => {
+            updateVolumeBarFill();
+            applyVolumeFromSlider();
+        });
+    }
+
     setInterval(refreshSeekUi, SEEK_POLL_MS);
 
     setStatus('Loading track list...');

@@ -10,6 +10,7 @@
     "wasm:build": "cmake --build build --target player backend_psx backend_snes backend_nez backend_n64",
     "wasm": "npm run wasm:configure && npm run wasm:build",
     "assets:prepare": "node tools/prepare-web-assets.mjs",
+    "samples:index": "node tools/generate-sample-index.mjs",
     "dev": "npm run wasm && npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "build": "npm run wasm && npm run assets:prepare && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 8137",

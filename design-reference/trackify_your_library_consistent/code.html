@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trackify | Your Library</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&amp;family=Inter:wght@400;500&amp;family=Geist:wght@500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-effect {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .neon-border-hover:hover {
+      box-shadow: 0 0 15px rgba(210, 187, 255, 0.3);
+      border-color: rgba(210, 187, 255, 0.5);
+    }
+    body {
+      background-color: #0b1326;
+      color: #dae2fd;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1326;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2d3449;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7c3aed;
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary-container": "#7c3aed",
+            "surface-variant": "#2d3449",
+            "on-secondary-fixed": "#001f26",
+            "outline-variant": "#4a4455",
+            "on-background": "#dae2fd",
+            "surface-bright": "#31394d",
+            "on-secondary": "#003640",
+            "secondary-container": "#03b5d3",
+            "secondary-fixed": "#acedff",
+            "background": "#0b1326",
+            "on-surface": "#dae2fd",
+            "secondary": "#4cd7f6",
+            "on-tertiary-fixed": "#40000d",
+            "surface-container-highest": "#2d3449",
+            "on-tertiary": "#67001b",
+            "on-secondary-container": "#00424e",
+            "on-error": "#690005",
+            "inverse-surface": "#dae2fd",
+            "secondary-fixed-dim": "#4cd7f6",
+            "inverse-on-surface": "#283044",
+            "on-primary-container": "#ede0ff",
+            "surface-container-lowest": "#060e20",
+            "surface-tint": "#d2bbff",
+            "on-error-container": "#ffdad6",
+            "on-surface-variant": "#ccc3d8",
+            "tertiary-fixed-dim": "#ffb2b7",
+            "on-primary-fixed-variant": "#5a00c6",
+            "primary-fixed": "#eaddff",
+            "outline": "#958da1",
+            "surface-container-low": "#131b2e",
+            "surface": "#0b1326",
+            "tertiary-fixed": "#ffdadb",
+            "tertiary-container": "#c81a42",
+            "primary-fixed-dim": "#d2bbff",
+            "on-tertiary-fixed-variant": "#92002a",
+            "error-container": "#93000a",
+            "on-primary": "#3f008e",
+            "surface-container-high": "#222a3d",
+            "on-primary-fixed": "#25005a",
+            "primary": "#d2bbff",
+            "inverse-primary": "#732ee4",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-dim": "#0b1326",
+            "tertiary": "#ffb2b7",
+            "on-tertiary-container": "#ffdedf",
+            "error": "#ffb4ab",
+            "surface-container": "#171f33"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "gutter-desktop": "24px",
+            "gutter-mobile": "16px",
+            "unit": "8px",
+            "margin-page": "40px",
+            "margin-mobile": "20px",
+            "max-width": "1440px"
+          },
+          "fontFamily": {
+            "headline-lg": ["Montserrat"],
+            "body-lg": ["Inter"],
+            "headline-xl": ["Montserrat"],
+            "label-md": ["Geist"],
+            "headline-md": ["Montserrat"],
+            "body-md": ["Inter"],
+            "label-sm": ["Geist"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "headline-xl": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+          }
+        },
+      }
+    }
+  </script>
+</head>
+<body class="font-body-md text-on-surface selection:bg-primary/30">
+<!-- Side Navigation Bar -->
+<aside class="fixed h-full w-[240px] left-0 top-0 bg-surface-container-low dark:bg-surface-container-low backdrop-blur-xl border-r border-white/10 z-40 flex flex-col py-8 px-6">
+<div class="mb-10">
+<h1 class="font-headline-xl text-[28px] font-extrabold text-primary-container dark:text-primary tracking-tighter">Trackify</h1>
+<p class="font-label-sm text-on-surface-variant opacity-70">Cyber-Orchestra Edition</p>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="flex items-center gap-4 py-3 px-4 rounded-xl text-on-surface-variant font-medium hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md">Home</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 rounded-xl text-on-surface-variant font-medium hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="devices">devices</span>
+<span class="font-label-md">Platforms</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 rounded-xl text-on-surface-variant font-medium hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-md">Composers</span>
+</a>
+<!-- Active Navigation for Library Page -->
+<a class="flex items-center gap-4 py-3 px-4 rounded-xl text-primary font-bold border-r-2 border-primary bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="library_music" style="font-variation-settings: 'FILL' 1;">library_music</span>
+<span class="font-label-md">Your Library</span>
+</a>
+<div class="mt-8">
+<button class="w-full bg-primary-container text-on-primary-container py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform duration-200 active:scale-95 shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span class="font-label-md">Create Playlist</span>
+</button>
+</div>
+</nav>
+<div class="flex flex-col gap-2 mt-auto pt-6 border-t border-white/5">
+<a class="flex items-center gap-4 py-2 px-4 rounded-xl text-on-surface-variant font-medium hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md">Settings</span>
+</a>
+<a class="flex items-center gap-4 py-2 px-4 rounded-xl text-on-surface-variant font-medium hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+<span class="font-label-md">Downloads</span>
+</a>
+</div>
+</aside>
+<!-- Top App Bar -->
+<header class="fixed top-0 right-0 left-[240px] h-16 glass-effect bg-background/80 flex justify-between items-center px-8 z-30 border-b border-white/5">
+<div class="flex items-center gap-6 flex-1">
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-xl" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<div class="flex items-center w-full max-w-md bg-surface-container-high rounded-full px-4 py-1.5 border border-white/5 focus-within:border-primary transition-all">
+<span class="material-symbols-outlined text-on-surface-variant mr-3" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-on-surface font-body-md w-full placeholder:text-on-surface-variant/50" placeholder="Search your library" type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-secondary rounded-full border-2 border-background"></span>
+</button>
+<div class="flex items-center gap-3 bg-surface-container-high py-1 px-3 rounded-full cursor-pointer hover:bg-surface-variant transition-colors border border-white/5">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-primary-container flex items-center justify-center border border-white/10">
+<img alt="User profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBmZVaVRAR73wByaguFjbQFsnewmlBaqPn_DQR_5xLwiasDz1Sij-vkl2mlQsxf5wNwrWtCpLiILQcHs1FwLMXf5LahiuF7ddvh24kI_1Yjv5HEtenzS8legGgarZP6RhK99wRc1fca-SDULgi8sKv2sw4ylXsQvq1Dr8LD4iGndIsXFaNsxg7lnfNcmC0CKnyXxUQxGMJy9ysz0dIn7DxASXhjzRtg5g5xMEc3XLQTdbxMLWjxRg0M8j2s7Y5L3G8pDR-02WXEd_4"/>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+</header>
+<!-- Main Canvas Content -->
+<main class="ml-[240px] pt-24 pb-32 px-8 min-h-screen">
+<!-- Hero Section / Liked Songs Anchor -->
+<section class="mb-12">
+<div class="relative overflow-hidden rounded-2xl p-10 flex items-end min-h-[300px] bg-gradient-to-br from-primary-container via-on-primary-fixed-variant to-background group cursor-pointer hover:scale-[1.01] transition-transform duration-300">
+<div class="absolute top-0 right-0 w-1/2 h-full opacity-20 overflow-hidden pointer-events-none">
+<div class="absolute inset-0 bg-gradient-to-l from-background to-transparent z-10"></div>
+<img class="w-full h-full object-cover transform scale-125 group-hover:scale-150 transition-transform duration-1000" data-alt="Abstract colorful music wave background with neon purple and blue lights, cinematic atmosphere with floating dust particles, high fidelity digital art style reflecting premium gaming audio experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcVFlFYs5qkCt-WO9pc_L_MHuQjGbRg0SrA0rQKN5SHSw-Amwozm5CHM7mnHlCs-p1ZNiHZP7T7jXkl8fdUTLoTLenhE_mTbWjtl81MkOuF2eXdYTotdK1q6mw6DksSdLC1I7bS19Qt9fx85oA3J4K09dElIZ9c9o0x5-zEjT5oDDtGtlYJ6C1EDuruZImpTEhExEYRHy5KxJqSG7Y63-rIVggDr8BhfBKt24flsntdbNxyyXJGTBUF_zRz-JFyDxi0WDaIIeoam2j"/>
+</div>
+<div class="relative z-10 flex gap-8 items-end">
+<div class="w-48 h-48 rounded-xl shadow-2xl flex items-center justify-center bg-gradient-to-tr from-primary to-secondary p-1 transform rotate-[-2deg] group-hover:rotate-0 transition-transform duration-500">
+<div class="w-full h-full bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-7xl" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</div>
+</div>
+<div class="flex flex-col mb-2">
+<span class="font-label-sm uppercase tracking-[0.2em] text-white/70 mb-2">Playlist</span>
+<h2 class="font-headline-xl text-white mb-4">Liked Songs</h2>
+<div class="flex items-center gap-3">
+<span class="font-body-md text-white font-semibold">1,284 tracks</span>
+<span class="w-1.5 h-1.5 rounded-full bg-white/30"></span>
+<button class="bg-white text-background w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Library Controls -->
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-6">
+<h3 class="font-headline-lg text-on-surface">Your Playlists</h3>
+<div class="flex gap-2">
+<span class="px-4 py-1.5 rounded-full bg-primary-container/20 text-primary font-label-sm border border-primary/20">All</span>
+<span class="px-4 py-1.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm border border-white/5 hover:border-white/10 cursor-pointer">Curated</span>
+<span class="px-4 py-1.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm border border-white/5 hover:border-white/10 cursor-pointer">Collaborative</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 mr-4">
+<span class="font-label-sm text-on-surface-variant">Public View</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/20 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<button class="p-2 text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined" data-icon="grid_view">grid_view</span></button>
+<button class="p-2 text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined" data-icon="list">list</span></button>
+</div>
+</div>
+<!-- Playlists Bento/Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter-desktop">
+<!-- New Playlist Card (The Action) -->
+<div class="group relative flex flex-col items-center justify-center p-6 bg-surface-container-low border-2 border-dashed border-white/10 rounded-2xl hover:border-primary/40 transition-all cursor-pointer min-h-[340px]">
+<div class="w-20 h-20 rounded-full bg-surface-container-high flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-primary text-4xl" data-icon="add">add</span>
+</div>
+<span class="font-headline-md text-on-surface mb-2">Create New</span>
+<p class="font-body-md text-on-surface-variant text-center opacity-60">Build a fresh mix for your next journey</p>
+</div>
+<!-- Playlist 1: Cyberpunk Beats -->
+<div class="group flex flex-col p-4 bg-surface-container rounded-2xl border border-white/5 neon-border-hover transition-all cursor-pointer">
+<div class="grid grid-cols-2 gap-1 rounded-xl overflow-hidden mb-5 aspect-square relative">
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+<button class="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform duration-300 shadow-xl">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsD940Nx19Q7Ecw1g8dcDCwMrdQ9-weIZU5dA1X7Nrb5k1RWSSFMliiKHQYOX-D8l2frmmPxygUfWDaNjpGTOpoLjk997hBv38PAe_FgQYaXjGO3P15YlwZ8Nsokfvn-Xn_l6xczO0Q611QIQCNMUCSiVHGqtjHIQEWQg2H3hISf5y_7ZHNshaocO2xNGpLAVbqnGUcmJPYR03HB_rSzL_rTwlQghxnufGaQhWZtL2gQTgy4n8382FqokbiIeKwBibIVX8IIiK26gt"/>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzODgF4dIhVn1F1HqSuiSGAbrOIiUi25gmeCSTlQvatEzg8inAch12Rb85LoxpPhwNXxpA8HXX9uD-1J3HT2pZhjeyLzL55vVlIBYA-hb6tglAhX7KcZoES9pw0sajrcrYJ_gQl2zLn8aPaBZ2ho10RTcW-chpIP6OMnRpTqyETQo7LYP3g7LPAEEB9J18XQINNhCG5SJB9BnBZEbw8azrF-55cBLpUFfHCin0_lun9uNSa2i4-OYeKNwSeFpf8g5jMlUcHLGe_xIB"/>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGKcwcs5kGqj9Iih7cfFvoXfT4SSSPfNzM-NwFLtkFknEQjREwMEftK6Cs8muMXFsg2X_rxrEg6cXAIJlyhCHVrTHAsHerTWdsYspH0Y42MYQ8vO9Iy5620n2RTRt-xIrqW6RQghH6EBdktqf_8W8iiM6CxLGexIEc4QN5OD2j_VVKgTt7_Fyh67o6XnDPVQ-MzM7mvdAKxudo3AgMh9dM_BFCdnCQS5MbdysGo_j2-tVRGLDn9EaBOqaxHVBYKG4VldUCcKD0H18j"/>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDf0iZJLwSp1fpFaqwjz65LfvtCfVolKAUxYv2x9mSnswPDcBxPgvFBNh8fJcP8ZqbVYHSp3QKNVBNXyjrk6MqzyFxqjIG3n7swd_0Glz_IuQtgZwG4djZ9NF1U57d0J1eS4bMKHnVwQgW9DIRkpkQczl88_ompVZxC9LcD1N6kUqgihUQTPO0BTCQbcotSSAiAN4VCBLquQRX9PmByl-6DECB6Wr4H-HB3qnYeQdKXtFcC1ea0FTwiz4npkzjBYgQ30BVTtguP5dlM"/>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-on-surface mb-1 group-hover:text-primary transition-colors">Cyberpunk 2077 Mix</h4>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-on-surface-variant">42 tracks</span>
+<span class="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+<span class="font-label-sm text-secondary font-bold">Public</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_vert">more_vert</span>
+</div>
+</div>
+<!-- Playlist 2: Retro Arcade -->
+<div class="group flex flex-col p-4 bg-surface-container rounded-2xl border border-white/5 neon-border-hover transition-all cursor-pointer">
+<div class="aspect-square rounded-xl overflow-hidden mb-5 bg-tertiary-container/20 flex items-center justify-center relative">
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+<button class="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform duration-300">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-1 w-full h-full">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBS9rQalFmLvyy0P6IkP2t9yVeNkCiLQxQ25OOLHNGigNrK69YUeLmpRu_nYw3nWEjjl96wmkLsJ9_OvrFsUOrtWbN2HosW_p775iIejLzorG2LStnW_ya7xONFQ6kgJn1dRxtJ2e-geSVkPGb7DYTDIrTi8wdvtdzlWo9d3fOeLWQUHprI_rkUhQvIb944P8oP-UHOeDkDPC1356_P9JPlAlMBii1isLCWoPvh-YkaqQFuLguWct2raw_jxNAghn3JJYBwNLsRR3cj"/>
+<div class="bg-surface-variant flex items-center justify-center"><span class="material-symbols-outlined text-on-surface-variant" data-icon="videogame_asset">videogame_asset</span></div>
+<div class="bg-primary-container/40 flex items-center justify-center"><span class="material-symbols-outlined text-primary" data-icon="token">token</span></div>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDORLowHYyueb0hNsd3W-yREl93J0fP5PFeg4_zMosHIIpGxloItKPLOR7AMMntYUSQUaME4rio79ZpioxG7HnKzIiz7wqhl9etEAstTgoAygCdE4nxFozSjRhw05x3wL7kVlhfP8gs91B_t5-8lL4-dTKA3kS796N9aOhO9JBZk3KQ-HIXWqomsLxFE-dZcKQhmw9oWugSj_Rvy1doK7URAMm_QHDGC2Edhaf6NKlS2VAzIFlJjJ4fOahFnNeoLzGSVRe_TbzZVo01"/>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-on-surface mb-1 group-hover:text-primary transition-colors">Retro Arcade Classics</h4>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-on-surface-variant">120 tracks</span>
+<span class="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+<span class="font-label-sm text-on-surface-variant">Private</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_vert">more_vert</span>
+</div>
+</div>
+<!-- Playlist 3: Orchestral Epics -->
+<div class="group flex flex-col p-4 bg-surface-container rounded-2xl border border-white/5 neon-border-hover transition-all cursor-pointer">
+<div class="grid grid-cols-2 gap-1 rounded-xl overflow-hidden mb-5 aspect-square relative">
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+<button class="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform duration-300">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGW9aODMCAg_5HfswfGd-cb8A2ZvpPLomOoYZuc6kRPoq-ZQFf0WNyNz-secsaXhnLHimhVINRJFF-jBlp33xlK14n9LZwAxx-uCr67cz-0WJz20yHgq_9MRVU1eLxZb-ke5HF6LmPfkscmE26JVQ_f1sdiXuDEX63dgfsvRh6Rz8OUjZUB-ID6R5EEhtzfQHGMAkw-O3RE2kd-wG_ybOoC5kRA-ekvUA7_NQn_6npM1ngTBOkQ0AQYXWa5-7F8I7WpxW1nxUsLm1L"/>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCI_8p9e0M5v0Y9AP7mCiOj8cgi4NfANiAElI-D0KJQrNyiis3MW2l9ufdD1-GykGX63eHIs1GhrwjMpDIOk2l56doweamzWuSNpm9Y9QGe7reuFBuUi-GKAyV4smnptzgYmYF9ZUexF6ek7yEdeb4B2saT6qHrMPx2bXC_SyabGWPAe3lBkQ9RCTrI9Q52-1sVURYDJkFANt4DCPCWN7LtwpNAC2npb5J059TrTwF8qFtkbJgFAX76atirtzjsY02dCotIeXz90YHU"/>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCW0iG_J5EcpyOiuEyyrEyVKTfce0NBT_HZ4_bNICIm4gu2a3HtpsBbab4KFDSUcGrpfywD8_DXMlgm02-7zZOqEoiY1PkzJOwwvWlSY_TM4pS9Vugx6tbHfOzLlRyTAwkL9B-7ohR_639N-DI1H4MJq4ePa3i6kTtgnXw1jHelN9OrDIlKQ0Kqj49FZgJCgMNRBNXz8TZBChUGTGOeFeGYFWxhHc0bfRd9P15LpbGzBDbEoDgSL-cY5DbFielcWFeC4FQPeHSofmpk"/>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDetq6-YBbW5ETsY5GUyuAUx5Q4vt6LNBLb0_g0wtZwcwcU38DFHISwgvsTKKfy-h-SgFSPGe7QHEZql3SuLCMrFmHqU715YmB5CZF693lk5kFf1irYDm26XKU6DLLOvUOOnkQXsqIDsRGHLDoEhzYgWg_q_Mgfugk9kETshY1eLPtaRy_X32KiGtbxw0FT1GuYR6zFBb8XnBW47u1JwWqfmWtWPRTzcT-lDqsyPAm7Nnr94Pe_4FNiWdI5N1Nx1cGKUnhKKxMOmizY"/>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-on-surface mb-1 group-hover:text-primary transition-colors">Orchestral Boss Themes</h4>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-on-surface-variant">18 tracks</span>
+<span class="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+<span class="font-label-sm text-secondary font-bold">Public</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_vert">more_vert</span>
+</div>
+</div>
+<!-- Playlist 4: Lo-Fi Study -->
+<div class="group flex flex-col p-4 bg-surface-container rounded-2xl border border-white/5 neon-border-hover transition-all cursor-pointer">
+<div class="aspect-square rounded-xl overflow-hidden mb-5 relative">
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+<button class="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform duration-300">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4s_hU79ugO32KHCuXDO1VS3CchNF47NyMsBa14cdcgPRhcTkvf5Exyzo6tW-EhMgroJioSBSiXsxRXvjhAXHq9By8VpN7cUMew_p41ZXxrB89FjtQDbMIcxaecZZ5DxdUhkWetjpiQFXCuUulpnvzGRy6uMDdhrPjpgULlT98GiA1EtE3BzAsbarQufO7ejVA_VQuz9cucn5OalGOKPnimiKRyMEqq02TFXPqvSQIFxfIYz1LlQYc_LAcp5gBT5jvcj3_LNg7l4Ps"/>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-on-surface mb-1 group-hover:text-primary transition-colors">Chill Quest Grinding</h4>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-on-surface-variant">256 tracks</span>
+<span class="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+<span class="font-label-sm text-on-surface-variant">Private</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_vert">more_vert</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Persistent Player / Footer -->
+<footer class="fixed bottom-0 left-0 w-full h-[90px] z-50 glass-effect bg-surface/90 border-t border-white/10 px-8 flex items-center justify-between">
+<!-- Current Track -->
+<div class="flex items-center gap-4 w-[300px]">
+<div class="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-white/10 group relative">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8v17cBYjSiQy49qqTnjCuiECrmVswlenH0oijLtN6-gZsGpD3eMh5hkbNHYtISwCiGtvGoI0vwEA2rw7DmtJAO42PWaeto_taCPojxHHcTGCbBkEbJAA2xtbQ1E4XHRKu4KBKclaw2X3JMo5u3mscZgO9wHTkkn60QfyIPue_lJNTJ-vrQ8NIYjPxO8ymuqOXlyD20hPz8XJXQgvO2aH7MLToKK3aDpNZ8yFQnvXMLgPxW33TmWYGOgafSPjuFJRqbqASV1DhmJRz"/>
+<div class="absolute inset-0 bg-primary/20 opacity-40 mix-blend-overlay"></div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-on-surface truncate">Neon District Theme</span>
+<span class="font-label-sm text-on-surface-variant truncate">Arcade High Score</span>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<!-- Player Controls -->
+<div class="flex flex-col items-center gap-2 flex-1 max-w-2xl">
+<div class="flex items-center gap-8">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="shuffle">shuffle</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="skip_previous" style="font-variation-settings: 'FILL' 1;">skip_previous</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-on-surface text-background flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-2xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="skip_next" style="font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="repeat">repeat</span>
+</button>
+</div>
+<div class="w-full flex items-center gap-3">
+<span class="font-label-sm text-on-surface-variant">1:45</span>
+<div class="flex-1 h-1 bg-surface-container-highest rounded-full overflow-hidden relative group cursor-pointer">
+<div class="absolute h-full bg-primary w-[40%] group-hover:bg-secondary transition-colors"></div>
+<div class="absolute left-[40%] top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="font-label-sm text-on-surface-variant">4:20</span>
+</div>
+</div>
+<!-- Extra Controls -->
+<div class="flex items-center justify-end gap-6 w-[300px]">
+<div class="flex items-center gap-2 group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary" data-icon="volume_up">volume_up</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-on-surface-variant w-2/3 group-hover:bg-primary transition-colors"></div>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="queue_music">queue_music</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="fullscreen">fullscreen</span>
+</button>
+</div>
+</footer>
+<script>
+    // Micro-interactions for hovering playlist cards
+    const cards = document.querySelectorAll('.neon-border-hover');
+    cards.forEach(card => {
+      card.addEventListener('mouseenter', () => {
+        card.querySelector('img')?.classList.add('scale-105');
+      });
+      card.addEventListener('mouseleave', () => {
+        card.querySelector('img')?.classList.remove('scale-105');
+      });
+    });
+
+    // Mock search interaction
+    const searchInput = document.querySelector('input[type="text"]');
+    if (searchInput) {
+      searchInput.addEventListener('focus', () => {
+        searchInput.parentElement.classList.add('ring-2', 'ring-primary/20');
+      });
+      searchInput.addEventListener('blur', () => {
+        searchInput.parentElement.classList.remove('ring-2', 'ring-primary/20');
+      });
+    }
+  </script>
+</body></html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trackify - High-Fidelity Gaming Audio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;family=Inter:wght@400;500&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-container": "#7c3aed",
+                    "surface-variant": "#2d3449",
+                    "on-secondary-fixed": "#001f26",
+                    "outline-variant": "#4a4455",
+                    "on-background": "#dae2fd",
+                    "surface-bright": "#31394d",
+                    "on-secondary": "#003640",
+                    "secondary-container": "#03b5d3",
+                    "secondary-fixed": "#acedff",
+                    "background": "#0b1326",
+                    "on-surface": "#dae2fd",
+                    "secondary": "#4cd7f6",
+                    "on-tertiary-fixed": "#40000d",
+                    "surface-container-highest": "#2d3449",
+                    "on-tertiary": "#67001b",
+                    "on-secondary-container": "#00424e",
+                    "on-error": "#690005",
+                    "inverse-surface": "#dae2fd",
+                    "secondary-fixed-dim": "#4cd7f6",
+                    "inverse-on-surface": "#283044",
+                    "on-primary-container": "#ede0ff",
+                    "surface-container-lowest": "#060e20",
+                    "surface-tint": "#d2bbff",
+                    "on-error-container": "#ffdad6",
+                    "on-surface-variant": "#ccc3d8",
+                    "tertiary-fixed-dim": "#ffb2b7",
+                    "on-primary-fixed-variant": "#5a00c6",
+                    "primary-fixed": "#eaddff",
+                    "outline": "#958da1",
+                    "surface-container-low": "#131b2e",
+                    "surface": "#0b1326",
+                    "tertiary-fixed": "#ffdadb",
+                    "tertiary-container": "#c81a42",
+                    "primary-fixed-dim": "#d2bbff",
+                    "on-tertiary-fixed-variant": "#92002a",
+                    "error-container": "#93000a",
+                    "on-primary": "#3f008e",
+                    "surface-container-high": "#222a3d",
+                    "on-primary-fixed": "#25005a",
+                    "primary": "#d2bbff",
+                    "inverse-primary": "#732ee4",
+                    "on-secondary-fixed-variant": "#004e5c",
+                    "surface-dim": "#0b1326",
+                    "tertiary": "#ffb2b7",
+                    "on-tertiary-container": "#ffdedf",
+                    "error": "#ffb4ab",
+                    "surface-container": "#171f33"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter-desktop": "24px",
+                    "gutter-mobile": "16px",
+                    "unit": "8px",
+                    "margin-page": "40px",
+                    "margin-mobile": "20px",
+                    "max-width": "1440px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Montserrat"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Montserrat"],
+                    "headline-xl": ["Montserrat"],
+                    "label-md": ["Geist"],
+                    "headline-md": ["Montserrat"],
+                    "body-md": ["Inter"],
+                    "label-sm": ["Geist"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #0b1326; color: #dae2fd; overflow-x: hidden; }
+        .glass-panel { backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .hero-gradient { background: linear-gradient(180deg, rgba(11, 19, 38, 0) 0%, rgba(11, 19, 38, 0.8) 70%, rgba(11, 19, 38, 1) 100%); }
+        .active-glow { box-shadow: 0 0 15px rgba(124, 58, 237, 0.5); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0b1326; }
+        ::-webkit-scrollbar-thumb { background: #2d3449; border-radius: 10px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- SideNavBar -->
+<aside class="fixed h-full w-[240px] left-0 top-0 bg-surface-container-low dark:bg-surface-container-low backdrop-blur-xl border-r border-white/10 flex flex-col py-unit px-gutter-desktop z-50">
+<div class="mb-8 pt-4">
+<h1 class="font-headline-xl text-[24px] font-extrabold text-primary-container dark:text-primary">Trackify</h1>
+<p class="font-label-sm text-on-surface-variant opacity-60">Cyber-Orchestra Edition</p>
+</div>
+<nav class="flex-grow space-y-1">
+<a class="flex items-center gap-4 py-3 px-4 rounded-lg text-primary font-bold border-r-2 border-primary bg-white/5 transition-colors group" href="#">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 rounded-lg text-on-surface-variant font-medium hover:bg-white/5 transition-colors group" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-label-md text-label-md">Platforms</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 rounded-lg text-on-surface-variant font-medium hover:bg-white/5 transition-colors group" href="#">
+<span class="material-symbols-outlined" data-icon="person_search">person_search</span>
+<span class="font-label-md text-label-md">Composers</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 rounded-lg text-on-surface-variant font-medium hover:bg-white/5 transition-colors group" href="#">
+<span class="material-symbols-outlined" data-icon="library_music">library_music</span>
+<span class="font-label-md text-label-md">Your Library</span>
+</a>
+<div class="mt-8">
+<button class="w-full py-3 px-4 bg-primary-container text-on-primary-container font-bold rounded-full transition-transform duration-200 active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+<span class="font-label-md text-label-md">Create Playlist</span>
+</button>
+</div>
+</nav>
+<div class="mt-auto space-y-2 border-t border-white/5 pt-4 pb-4">
+<a class="flex items-center gap-4 py-2 px-4 text-on-surface-variant font-medium hover:text-secondary transition-colors group" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+<a class="flex items-center gap-4 py-2 px-4 text-on-surface-variant font-medium hover:text-secondary transition-colors group" href="#">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+<span class="font-label-md text-label-md">Downloads</span>
+</a>
+</div>
+</aside>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 left-[240px] h-16 bg-background/80 backdrop-blur-md flex justify-between items-center px-gutter-desktop z-40">
+<div class="flex items-center gap-6 flex-grow max-w-2xl">
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]" data-icon="search">search</span>
+<input class="w-full bg-surface-container-high border border-outline-variant/30 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:border-primary transition-colors font-body-md text-sm" placeholder="Search for soundtracks, eras, or composers..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6 ml-6">
+<button class="text-on-surface-variant hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-secondary rounded-full border border-background"></span>
+</button>
+<div class="flex items-center gap-3 cursor-pointer group">
+<img alt="User profile" class="w-8 h-8 rounded-full border border-primary/20 group-hover:border-primary transition-colors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKSh0y6yOnzu7cE-lDRqwDjX-bdK1wD2fPldPfKVsBoMLXYz9e1-u_GKyfATzgNA95PX09doE-8l-rtrmRtNgfUrtxNDmes-9vuV1Vh4iBusFOv0SpP9eTLNW1DqBk_YX8Y6XYbDIXUsvJeVW6f35SwDDRMo06SofdgZY-aJpFvbfZGpPLP25nReHB4GBIzX6fn43njLY71H4k-TzLSooZZsWZy1Rzz8sbPVGhujVyNcJsgOYTxQTJhAJmIZJ_CdtVAaO5sR2cjfMK"/>
+<span class="font-label-md text-label-md hidden lg:block">RetroVibe_99</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] pt-16 pb-[120px] min-h-screen">
+<!-- Soundtrack of the Month Hero -->
+<section class="relative h-[480px] w-full overflow-hidden">
+<div class="absolute inset-0">
+<img alt="Soundtrack of the Month Hero" class="w-full h-full object-cover" data-alt="A cinematic, atmospheric high-angle shot of a lush fantasy forest landscape at dusk, with glowing ethereal blue flora and floating magical particles. The scene is rendered in a deep obsidian and midnight blue color palette with vibrant neon cyan and violet highlights, reflecting a modern high-fidelity gaming aesthetic. Soft mist rolls between ancient trees under a vast starry sky, evoking a sense of digital mystery and epic adventure typical of an orchestral RPG soundtrack." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAd_H7I40gvr-iHXQE-mwfhwRPuDQDaGYc-u207EsxCLwgKpE85ah7sf3Y054tISqGEJB6BuyC0kHTSVo0X_LmZuTG3Hx-nToM6zjt0aYyRkKVSCi1yu0a4I_1W5OLcTLsNNt2utUsn33PCjQcyC5Wt2cVLFsEKiTxr7bvOEnESYwSqzLNvmc_V5fB-tnvLAE7G0uw7kqC_M_Wnj8PZuDvh0yQ_s_MPNMr24B6KqsMNi3d-8ylki8ISZk77HknEDDgndfj5vZvsFi3u"/>
+<div class="hero-gradient absolute inset-0"></div>
+</div>
+<div class="relative h-full flex flex-col justify-end px-margin-page pb-12 max-w-screen-xl mx-auto">
+<div class="bg-primary/20 backdrop-blur-md border border-primary/30 w-fit px-3 py-1 rounded-sm mb-4">
+<span class="font-label-sm text-primary uppercase tracking-widest">Soundtrack of the Month</span>
+</div>
+<h2 class="font-headline-xl text-white mb-2 leading-none">Elden Ring: Shadow of the Erdtree</h2>
+<p class="font-body-lg text-on-surface-variant max-w-2xl mb-8">Experience the hauntingly beautiful orchestral arrangements of the Lands Between. A masterclass in dark fantasy composition by Tsukasa Saitoh.</p>
+<div class="flex items-center gap-4">
+<button class="bg-primary hover:bg-primary-container text-on-primary py-3 px-8 rounded-full font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+                        Listen Now
+                    </button>
+<button class="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white py-3 px-8 rounded-full font-bold flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                        Save to Library
+                    </button>
+</div>
+</div>
+</section>
+<div class="px-margin-page max-w-screen-xl mx-auto space-y-16 mt-12">
+<!-- Browse by Platform (Bento Inspired) -->
+<section>
+<div class="flex justify-between items-end mb-8">
+<div>
+<h3 class="font-headline-lg text-headline-lg">Browse by Platform</h3>
+<p class="text-on-surface-variant font-body-md">Journey through gaming history</p>
+</div>
+<a class="text-primary font-label-md hover:underline" href="#">View All Eras</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 h-[400px]">
+<div class="md:col-span-2 relative group cursor-pointer overflow-hidden rounded-xl bg-surface-container-high border border-white/5">
+<img alt="SNES Era" class="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" data-alt="A nostalgic close-up of a vintage 16-bit gaming console and colorful cartridges on a reflective dark surface. The lighting is dominated by a warm neon pink and cool blue synthwave glow, creating a retro-arcade atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmX9NcQw48ztGJAbPnRqyCd9bcGyCCdM-FIZQ_KxkPR-zEhUUS27FV9IcC6F-K__5UnZLlsxh09qbWS5pbx7lNt_34FvssOou_Vw9xxuuDssXJ_qnGmBqfAGjycE-RZy-gsYGJwsS2SDJofGKB3q2gHcbpUI5MJ2mKYaYWfhcjkUvRFJsRXldrnbxw6-nUTBPrhuBhgsGARAF8SQtKl6sq3TneGUDGrLrsBIPhUUO2y9rnDdMq9zM9d0CQMi4P2-pmYG1GHl6jKp-4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-6 left-6">
+<span class="bg-tertiary-container text-on-tertiary-container px-2 py-0.5 rounded text-[10px] font-bold uppercase mb-2 inline-block">16-Bit Era</span>
+<h4 class="font-headline-md text-headline-md text-white">Super Nintendo</h4>
+</div>
+</div>
+<div class="relative group cursor-pointer overflow-hidden rounded-xl bg-surface-container-high border border-white/5">
+<img alt="Modern Era" class="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" data-alt="A focused shot of a modern, sleek black game controller resting on a minimalist carbon fiber surface. Sharp edges and high-tech textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCweZrFTAC8cWz0WsWum2oQIzfVHV-k5f2lk4sQqVYipFArDwD-gHL7blfC9EbATuBGCeNNe6zD3ksweH_tG9kbsjRF8kgfznncgGGplGa2IKs3ASZBjZwiDPUCxiXATXIMEfBdxI9SUdjlzMdkv8egjYs6m0ZM-aiFXvgOtnHL8fYQc5caob5NhQmgfpXzQI-p6MfJbRIZ6VMqF5UCOR_pM7J0LpVWImVLkCe7MCs_Z0OdCAOhd3kQTixDjOhPG_Uc_DbboaE_SwPR"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-6 left-6">
+<span class="bg-primary-container text-on-primary-container px-2 py-0.5 rounded text-[10px] font-bold uppercase mb-2 inline-block">Modern</span>
+<h4 class="font-headline-md text-headline-md text-white">PlayStation 5</h4>
+</div>
+</div>
+<div class="md:row-span-2 relative group cursor-pointer overflow-hidden rounded-xl bg-surface-container-high border border-white/5">
+<img alt="PC Era" class="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" data-alt="An artistic close-up of a clear glass-cased computer showing glowing internal components." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEBKBA2cQliN0XojUkj93VTkBZjZpr3t371gPxYSvYtItIlghHEhepLJm6ZTloQQ-r62mqzP3AVYINtw8nLrTCKcMLCiydXdhOqcrX6wOt2D70iVi-lIWIGTHF-emiGjmqwxljZ6FsGtQ0vwlDzPk6ZsVn7ZNXl12sfBDNTVj9HkDXINcFeeeI657feibWwsuqLo6t2ObLSaGIBqvZorNaWtDsFeQNTky3JI3-qIRgWEA0p3Bq2vM1a-LrAQaLohBPGU_rymU_BiAG"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-6 left-6">
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded text-[10px] font-bold uppercase mb-2 inline-block">Master Race</span>
+<h4 class="font-headline-md text-headline-md text-white">PC Gaming</h4>
+</div>
+</div>
+<div class="relative group cursor-pointer overflow-hidden rounded-xl bg-surface-container-high border border-white/5">
+<img alt="NES Era" class="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" data-alt="A classic 8-bit handheld console sitting on a bed of bright pixel art decals." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoY1SrtBrVCbbiD_2BNswJ4hMkxR7x4WicgjpRwv5CjpHD6D8w9ROYYUukwMZfRtdfqIraBQwCTRarTbIC7S3-ulN62TWTqOfBf-aS0_kJTrMZPqV7vgNz3tVnHn5IJ1xKspGPJlO0GOZMQVhJo5TMIkmbSJuYirHsMuwiN0dIXXOwH0JbmIicCpl2GOG0PLoafBSDxhTBxbQSrCuD5inG2FiNmelbpxOw_TgTTQ8lJ_BZAJcd9s5syIBfy1-om9NyMTBWZu4OleH8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-6 left-6">
+<span class="bg-on-secondary-fixed-variant text-secondary-fixed px-2 py-0.5 rounded text-[10px] font-bold uppercase mb-2 inline-block">8-Bit Era</span>
+<h4 class="font-headline-md text-headline-md text-white">NES</h4>
+</div>
+</div>
+<div class="md:col-span-2 relative group cursor-pointer overflow-hidden rounded-xl bg-surface-container-high border border-white/5">
+<div class="absolute inset-0 bg-gradient-to-br from-primary-container/20 to-secondary-container/20"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="text-center">
+<span class="material-symbols-outlined text-4xl text-primary mb-2" data-icon="grid_view">grid_view</span>
+<h4 class="font-headline-md text-headline-md text-white">Explore All</h4>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Featured Composers -->
+<section>
+<div class="flex justify-between items-end mb-8">
+<div>
+<h3 class="font-headline-lg text-headline-lg">Featured Composers</h3>
+<p class="text-on-surface-variant font-body-md">The maestros behind the masterpieces</p>
+</div>
+</div>
+<div class="flex gap-10 overflow-x-auto pb-4 scroll-smooth no-scrollbar">
+<div class="flex flex-col items-center gap-4 min-w-[140px] group cursor-pointer">
+<div class="w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary transition-all duration-300 p-1">
+<img alt="Nobuo Uematsu" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAijYPhMZPXPn9AuQ6Abt3hGDLTS_6KyBs0PyN3kQk23YM1wgxmyqit7DUGBRswQiImy_OHz-MUz3zgU0ikc4SxWJsKpxlCP1fLsXr8M6uL5gkB5nsHJMEhN6YeucQjbNt6HIcOAYJXISJavZ00MZPZRKGK5_U3Ox7qXjIe8e_ty5eyxoW4rnWcngJ-tUZBag9T0Tapjwd585N_36FQa5dYId3HCnrucQv5WA7KtivWL663vFKLnL_hJKjVUElpgawA99mAiPUppxLd"/>
+</div>
+<span class="font-headline-md text-sm text-center">Nobuo Uematsu</span>
+</div>
+<div class="flex flex-col items-center gap-4 min-w-[140px] group cursor-pointer">
+<div class="w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-secondary transition-all duration-300 p-1">
+<img alt="Koji Kondo" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAM0aSH_qLMLOlb5dAO41ls84QaRtsLJdaEiBF9Sa4_N2jXGAI6ArQX2ZX8QhbxTKYDNcuXDvbzm3-0I3LDYqS_DJIDuodQMKPxY-EAkdoIEGoslvzMQZ2GjEQBR5jjI5zKJPPOsj3rl3v1Wq2IEFVGUe4XdmivkpTAtGfKV9uYys4ZZ4qqMpSI9i587N1Pce5awB1hqh-Thf_bbsSogG0zXotCcdJpGaAjiefan8v-7VdPs4sLAKs5hNv9h01TLORj3Q24Dx6KVCzW"/>
+</div>
+<span class="font-headline-md text-sm text-center">Koji Kondo</span>
+</div>
+<div class="flex flex-col items-center gap-4 min-w-[140px] group cursor-pointer">
+<div class="w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-tertiary transition-all duration-300 p-1">
+<img alt="Yoko Shimomura" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGGA4sqwRvt045TSnOpf9sjHdF-R6zDRs-8iRInaT8q8TL00oWuKynbBg4HiM0hYKVY_BGexy4pECWINOfDBJw-462DYyYnPgKZM6wQ_vgAmLXZIetbTfHO-cr6eeOJrKX7V9etGYJ_bnqfchYTjeECURQL_lTMvsnXgybAymg33WWQzfTwiEzw5PJNWjDp2RnLsd73F1JE4wT07iNrmjZN7fkWr6kJW2chEJMqRijMmCgFjO3uDz7Bdw5HJpgwGSyr7UjZBYJ7ec0"/>
+</div>
+<span class="font-headline-md text-sm text-center">Yoko Shimomura</span>
+</div>
+<div class="flex flex-col items-center gap-4 min-w-[140px] group cursor-pointer">
+<div class="w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary transition-all duration-300 p-1">
+<img alt="Akira Yamaoka" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7PFngBorp-NtxDdHhvF7SB0ANSqwY7kCnGeTzbTKcEF80CvuRZso7gPS_nAi7kqZ3g2_qPQcW7O1hefFP-8aSUgeKp3pBSxrPR3-QJaICATTpRVTyd2WFk6Jo7BZdd5rn0F7vEAVn0zqxtfO1VSqM0V3mDf-EpqeuUZKySwSV8oUoqv0SWczQzrPJy3L9FtQbY-HM1IpZCApTgZrRt02b7pax6ZtQm1FA6GsrZ1HifTJGM4Dvr7QJ-jWKp8BDV4FkAiBjwIReGvdV"/>
+</div>
+<span class="font-headline-md text-sm text-center">Akira Yamaoka</span>
+</div>
+<div class="flex flex-col items-center gap-4 min-w-[140px] group cursor-pointer">
+<div class="w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-secondary transition-all duration-300 p-1">
+<img alt="Jeremy Soule" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFwVNrPMp1XWMMlCjlFu7hs0sqAi4jA7VzB4rYgVa90gthRRZcEVvFYwT1OAvmGSHWnjew58AwQC-dhhLu0CxQ9r5erwq5KNxSGyQwEG-UOJMYFJFJbQ7pjZB4wX29q0cKPTj2W_8LjaymY7odDmt-2K3LV1cTICgKEVG_wH3X0NdUQAyX8oGzhbU4CoDnwPAQqx_FTCuya3-10SEtARH9j3sFSU1M3Ost5jha_oSXpAJrh1QTsn9h_CjG6qlhh2tmubQ-MXaDSqk8"/>
+</div>
+<span class="font-headline-md text-sm text-center">Jeremy Soule</span>
+</div>
+</div>
+</section>
+<!-- Recently Played Games -->
+<section>
+<div class="flex justify-between items-end mb-8">
+<div>
+<h3 class="font-headline-lg text-headline-lg">Recently Played Games</h3>
+<p class="text-on-surface-variant font-body-md">Continue your audio journey</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-full border border-outline-variant hover:bg-white/5"><span class="material-symbols-outlined" data-icon="chevron_left">chevron_left</span></button>
+<button class="p-2 rounded-full border border-outline-variant hover:bg-white/5"><span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span></button>
+</div>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+<!-- Game Card 1 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[3/4] mb-3 overflow-hidden rounded-xl bg-surface-container">
+<img alt="Zelda" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A stylized digital illustration of a green forest temple." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPnNxss5lHFA_HphrYaWZchbaCUCMfZ8SFvUx4dQFOMimvn2lsJd8p6cnb5UDEU55s_ujKhDEiYlv5ulf9FwNBttssf6y8l_tmcj0ahKn6FwQFAMigp96vW_8KJmgLkPYPVnCbjNG7_W0DybgpJXkf7nj0JuCta5qLFtJF3LKc0832Ibvvd9svtLloB-5hO_b58XBxUtrm6xVHvcDlCnE51DKIBdQHk5FJ-DNnlKixdk7vfHx2IBQ0MlyPdHMFg4XGK0xw4FMz6flS"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform shadow-lg shadow-primary/40">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+</div>
+<h5 class="font-headline-md text-[14px] truncate">Zelda: Ocarina of Time</h5>
+<p class="font-label-sm text-on-surface-variant">N64 · 1998</p>
+</div>
+<!-- Game Card 2 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[3/4] mb-3 overflow-hidden rounded-xl bg-surface-container">
+<img alt="Final Fantasy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A vibrant digital abstract painting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuxjaa-f_POkc3adTnYUD_uERazyjdOkD4pBMzTVU0atwMPOTORcvhM1qndnj7_9MIt9yGLCHVseawdB9YB0coaKaVM2iqVD2qiNvHQYEkxY5HiU_veKSOrwUIAKqmHXcM3JCUKdy5o-Wm2OGwlTe8Me0j4WUqvJ000Ch92c_JwE5kJbxUDRkTqhmX8zb_J06mHNUjb3M6lCrINwzt5dRJHMxt5JPQaevhq8u4-EbbeiZVOqRCgcYEZI5LiBqUXDi4klly_Uph8y3i"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform shadow-lg shadow-primary/40">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+</div>
+<h5 class="font-headline-md text-[14px] truncate">Final Fantasy VII</h5>
+<p class="font-label-sm text-on-surface-variant">PS1 · 1997</p>
+</div>
+<!-- Game Card 3 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[3/4] mb-3 overflow-hidden rounded-xl bg-surface-container">
+<img alt="Castlevania" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A moody, fog-filled digital scene." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsNjpJuOMrt--eElO524Kz1JzJIn5bnjDJxR2tvrZXQQ9ktUihxtHJQbFXpjlUSzlSgswWJuPDW6CaIzkZkj9h32Zw_F7z-LzHR2XysOIgfD0CymYUplVEw-hGmjN9R1AYzlMQxhcqXZC4-Q2a7kxytXb1s3azmQ7OZUGadjCsj7DVahGScxz7Tb6XvS2LuHkltX_i7R8yTMUazoINJWc47T2LObjtZvDA6CpyTi4n_Eh1IyPEUnV7Cx8W_tvFYMEk6p8MxGpPHguX"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform shadow-lg shadow-primary/40">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+</div>
+<h5 class="font-headline-md text-[14px] truncate">Castlevania: SotN</h5>
+<p class="font-label-sm text-on-surface-variant">PS1 · 1997</p>
+</div>
+<!-- Game Card 4 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[3/4] mb-3 overflow-hidden rounded-xl bg-surface-container">
+<img alt="Halo" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A high-contrast digital render." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOnbd-QL-0bCaxx2mzRQpr--aSpQhPRd2KqVrpaSmFZJC-dEQVUvtlRG6Be3aZLKHNmiJ32hdWOgDL4lFIEVVy6ViYY9CP63ZjOrYQcoqAELiCl3KAUjfoBXa8kvSUDQBkm3ZeVgYLN29C1VzLV77cnaSqtNeZsY1NsS5ZjJB2CgTa4AJ0fXeFWZ3kzeIw-S8ebxvI1Hj6dInBMaUN5gjrm09XIoMOo_cXhMMkx5PUl52yIDo_7cuSJgBpazoN0NRIxvMpSAzvS8Ms"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform shadow-lg shadow-primary/40">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+</div>
+<h5 class="font-headline-md text-[14px] truncate">Halo: Combat Evolved</h5>
+<p class="font-label-sm text-on-surface-variant">Xbox · 2001</p>
+</div>
+<!-- Game Card 5 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[3/4] mb-3 overflow-hidden rounded-xl bg-surface-container">
+<img alt="Celeste" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A minimalist digital depiction of a pixelated sunset." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFIwLGMUf5O_cKRtucYzO42xVElvJgL4Eqgsx6e3kBtL3ZBRKj1esHYLiDPGziBXZYEVL9oXwS9eghUN1fETJLajlkRJ98WNslLOKLw78IrjzsUc-3HWbe5XAZ7GT3wx1Zd2xkycyNNlNaZJNxNdq4fHQkb4O06mDtUNB-D_KaKv-3Kg_Fj6qTgKUhzCbSv-Vx8-rV8d7TSah88ATYBZ7vGDD4Zd8HjUqilNRnKHPQzrtediXnBVh6-pBZjKNQIsGaiQA3nXYW7jYM"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform shadow-lg shadow-primary/40">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+</div>
+<h5 class="font-headline-md text-[14px] truncate">Celeste</h5>
+<p class="font-label-sm text-on-surface-variant">Multi · 2018</p>
+</div>
+<!-- Game Card 6 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[3/4] mb-3 overflow-hidden rounded-xl bg-surface-container">
+<img alt="Journey" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A dramatic digital painting of a lone futuristic warrior." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUW62oQCQx8ZUGCsrWBXgpooqTkg8GNuGfXzrk-2kn86KJLUnLtF7lx6u5OUeLKQ4_uRxmRI1-21KPhACyQJATMVseXRKBKAQUBqZeQBMlAPGZcvz6MXny_M0uff9rapGfFWowYpFtbqGX76ugQUgHkG7OzQt03bgACgOLatHePH-3Ok-cyS5rJ8qMbrXXmiLB92Mp8XHywzRp8Is88xrG8L5Nk7RjiwXZevzcXVIOEY7YMP4jzRaKjd3F1WEhlUstme6lN6oHDeG0"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary scale-90 group-hover:scale-100 transition-transform shadow-lg shadow-primary/40">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+</div>
+<h5 class="font-headline-md text-[14px] truncate">Journey</h5>
+<p class="font-label-sm text-on-surface-variant">PS3 · 2012</p>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer / Music Player Bar -->
+<footer class="fixed bottom-0 left-0 w-full h-[90px] z-50 glass-panel bg-surface/90 backdrop-blur-2xl border-t border-white/10 shadow-2xl flex items-center justify-between px-gutter-desktop">
+<!-- Now Playing Track -->
+<div class="flex items-center gap-4 w-1/3">
+<div class="w-14 h-14 rounded overflow-hidden bg-surface-container active-glow">
+<img alt="Current Track" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6Pwflx0FjxdtqK8MeIGZO7BRgUjnZCttVLi4dSo6zB_tu_D8SE1MaBWhje6CD7iSDcKq9KXSXzJ3hGjl_UVojA8ksO1Pj0ogzlj1HKDhIGukW3CAh5SlsbDc7xpubkAqvx3vsP4B9ViGfYyYLNGLw5aUpQfdKrnzDF6Tch21Q_ji7nIjqpeRaas11jv6xL0Jmi8DL-1fCFdlc2HVBHW7RtiLnw0_mf72OaTA1nO_ioyLt682hNCcX-5ejgwEp6Alcu_dT9jay3R8c"/>
+</div>
+<div>
+<h6 class="font-headline-md text-sm text-white hover:underline cursor-pointer">Gerudo Valley</h6>
+<p class="font-label-sm text-on-surface-variant">Koji Kondo · Zelda: Ocarina of Time</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors ml-2">
+<span class="material-symbols-outlined" data-icon="favorite" style="font-variation-settings: 'FILL' 0;">favorite</span>
+</button>
+</div>
+<!-- Controls -->
+<div class="flex flex-col items-center w-1/3">
+<div class="flex items-center gap-6 mb-2">
+<button class="text-on-surface-variant hover:text-white transition-colors"><span class="material-symbols-outlined" data-icon="shuffle">shuffle</span></button>
+<button class="text-on-surface-variant hover:text-white transition-colors"><span class="material-symbols-outlined" data-icon="skip_previous">skip_previous</span></button>
+<button class="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-transform">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors"><span class="material-symbols-outlined" data-icon="skip_next">skip_next</span></button>
+<button class="text-on-surface-variant hover:text-white transition-colors"><span class="material-symbols-outlined" data-icon="repeat">repeat</span></button>
+</div>
+<div class="w-full flex items-center gap-3">
+<span class="font-label-sm text-on-surface-variant text-[10px]">1:45</span>
+<div class="flex-grow h-1 bg-surface-container-highest rounded-full overflow-hidden relative group cursor-pointer">
+<div class="absolute left-0 top-0 bottom-0 w-[45%] bg-primary active-glow"></div>
+<div class="absolute left-[45%] top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="font-label-sm text-on-surface-variant text-[10px]">3:32</span>
+</div>
+</div>
+<!-- Volume & Actions -->
+<div class="flex items-center justify-end gap-4 w-1/3">
+<button class="text-on-surface-variant hover:text-white"><span class="material-symbols-outlined" data-icon="playlist_play">playlist_play</span></button>
+<button class="text-on-surface-variant hover:text-white"><span class="material-symbols-outlined" data-icon="devices">devices</span></button>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="volume_up">volume_up</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-2/3 h-full bg-on-surface-variant"></div>
+</div>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('.group').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.classList.add('scale-95');
+                setTimeout(() => el.classList.remove('scale-95'), 100);
+            });
+        });
+
+        // Simple mock for "Play" toggle
+        const playBtn = document.querySelector('footer button.bg-white');
+        if (playBtn) {
+            let isPlaying = false;
+            playBtn.addEventListener('click', () => {
+                isPlaying = !isPlaying;
+                const icon = playBtn.querySelector('.material-symbols-outlined');
+                icon.textContent = isPlaying ? 'pause' : 'play_arrow';
+                playBtn.classList.toggle('bg-primary', isPlaying);
+                playBtn.classList.toggle('text-white', isPlaying);
+                playBtn.classList.toggle('bg-white', !isPlaying);
+                playBtn.classList.toggle('text-black', !isPlaying);
+            });
+        }
+    </script>
+</body></html>
