@@ -13,3 +13,6 @@
 [submodule "submodules/webnez"]
 	path = submodules/webnez
 	url = https://bitbucket.org/wothke/webnez.git
+[submodule "submodules/webn64"]
+	path = submodules/webn64
+	url = https://bitbucket.org/wothke/webn64.git
