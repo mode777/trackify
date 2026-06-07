@@ -16,3 +16,6 @@
 [submodule "submodules/webn64"]
 	path = submodules/webn64
 	url = https://bitbucket.org/wothke/webn64.git
+[submodule "submodules/vgmplay-0.40.9"]
+	path = submodules/vgmplay-0.40.9
+	url = https://bitbucket.org/wothke/vgmplay-0.40.9.git
