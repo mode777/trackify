@@ -18,6 +18,7 @@ const TYPE_ERROR = 'error';
 const CONTROL_REGISTER = 'control/service.register';
 const CONTROL_READY = 'control/service.ready';
 const CONTROL_SUBSCRIPTIONS = 'control/service.subscriptions.update';
+const REGISTER_RETRY_INTERVAL_MS = 250;
 
 function createId() {
     if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
@@ -93,6 +94,10 @@ class TrackifyBroker {
         this.subscriptions = new Map();
         this.requestHandlers = new Map();
         this.pendingRequests = new Map();
+        this.queuedRequests = new Map();
+        this.outboundQueue = [];
+        this.shellReady = this.mode === 'shell';
+        this.registerRetryTimerId = null;
 
         this.seenMessageIds = new Set();
         this.seenMessageQueue = [];
@@ -146,33 +151,34 @@ class TrackifyBroker {
 
     logIncomingMessage(event, message) {
         const fromFrame = this.describeSourceFrame(event && event.source, message.source);
-        console.info('[TrackifyBroker][recv]', {
-            mode: this.mode,
-            id: message.id,
-            type: message.type,
-            topic: message.topic,
-            sourceService: message.source,
-            fromFrame,
-            eventOrigin: event && event.origin ? event.origin : 'unknown',
-            target: message.target,
-            correlationId: message.correlationId || null,
-        });
+        // console.info('[TrackifyBroker][recv]', {
+        //     mode: this.mode,
+        //     id: message.id,
+        //     type: message.type,
+        //     topic: message.topic,
+        //     sourceService: message.source,
+        //     fromFrame,
+        //     eventOrigin: event && event.origin ? event.origin : 'unknown',
+        //     target: message.target,
+        //     correlationId: message.correlationId || null,
+        // });
     }
 
     logOutgoingMessage(message, targetWindow, targetOrigin) {
         const toFrame = this.describeTargetFrame(message.target, targetWindow);
-        console.info('[TrackifyBroker][send]', {
-            mode: this.mode,
-            id: message.id,
-            type: message.type,
-            topic: message.topic,
-            sourceService: message.source,
-            fromFrame: this.serviceId,
-            target: message.target,
-            toFrame,
-            targetOrigin,
-            correlationId: message.correlationId || null,
-        });
+        console.info(`[Broker|${message.type}${message.correlationId ? `|${message.correlationId}` : ''}] ${this.serviceId}: ${message.topic}`, message.payload);
+        // {
+        //     mode: this.mode,
+        //     id: message.id,
+        //     type: message.type,
+        //     topic: message.topic,
+        //     sourceService: message.source,
+        //     fromFrame: this.serviceId,
+        //     target: message.target,
+        //     toFrame,
+        //     targetOrigin,
+        //     correlationId: message.correlationId || null,
+        // });
     }
 
     start() {
@@ -181,9 +187,11 @@ class TrackifyBroker {
         this.started = true;
 
         if (this.mode === 'frame') {
+            this.shellReady = false;
             this.sendControl(CONTROL_REGISTER, {
                 subscriptions: [],
             }, 'shell');
+            this.startRegisterRetry();
         }
     }
 
@@ -198,6 +206,14 @@ class TrackifyBroker {
             pending.reject(new Error('Broker destroyed before response was received'));
         }
         this.pendingRequests.clear();
+
+        for (const queued of this.queuedRequests.values()) {
+            queued.reject(new Error('Broker destroyed before queued request was sent'));
+        }
+        this.queuedRequests.clear();
+
+        this.outboundQueue = [];
+        this.stopRegisterRetry();
 
         this.subscriptions.clear();
         this.requestHandlers.clear();
@@ -264,6 +280,18 @@ class TrackifyBroker {
         );
 
         return new Promise((resolve, reject) => {
+            if (this.mode === 'frame' && !this.shellReady) {
+                this.queuedRequests.set(message.id, {
+                    resolve,
+                    reject,
+                    timeoutMs,
+                    topic,
+                });
+
+                this.enqueueOutboundMessage(message, options.targetWindow);
+                return;
+            }
+
             const timerId = globalThis.setTimeout(() => {
                 this.pendingRequests.delete(message.id);
                 reject(new Error('Request timed out for topic: ' + topic));
@@ -360,16 +388,96 @@ class TrackifyBroker {
                 throw new Error('Cannot resolve target window for message topic: ' + message.topic);
             }
             const targetOrigin = this.resolveTargetOrigin(message.target);
-            this.logOutgoingMessage(message, resolvedTargetWindow, targetOrigin);
-            resolvedTargetWindow.postMessage(message, targetOrigin);
+            this.postMessageWithLogging(message, resolvedTargetWindow, targetOrigin);
             return;
         }
 
         if (!this.parentWindow || this.parentWindow === globalThis) {
             throw new Error('Frame broker requires a parent window');
         }
-        this.logOutgoingMessage(message, this.parentWindow, this.targetOrigin);
-        this.parentWindow.postMessage(message, this.targetOrigin);
+
+        if (this.shouldQueueFrameMessage(message)) {
+            this.enqueueOutboundMessage(message, targetWindow);
+            return;
+        }
+
+        this.postMessageWithLogging(message, this.parentWindow, this.targetOrigin);
+    }
+
+    shouldQueueFrameMessage(message) {
+        if (this.mode !== 'frame') return false;
+        if (this.shellReady) return false;
+        if (message.type === TYPE_CONTROL && message.topic === CONTROL_REGISTER) return false;
+        return true;
+    }
+
+    enqueueOutboundMessage(message, targetWindow) {
+        this.outboundQueue.push({
+            message,
+            targetWindow,
+        });
+    }
+
+    flushOutboundQueue() {
+        if (!this.outboundQueue.length) return;
+
+        const queued = this.outboundQueue.splice(0, this.outboundQueue.length);
+        for (const entry of queued) {
+            this.sendQueuedMessage(entry.message, entry.targetWindow);
+        }
+    }
+
+    sendQueuedMessage(message, targetWindow) {
+        if (message.type === TYPE_REQUEST) {
+            this.activateQueuedRequest(message.id);
+        }
+
+        this.postMessageWithLogging(message, targetWindow || this.parentWindow, this.targetOrigin);
+    }
+
+    activateQueuedRequest(messageId) {
+        const queued = this.queuedRequests.get(messageId);
+        if (!queued) return;
+
+        const timerId = globalThis.setTimeout(() => {
+            this.pendingRequests.delete(messageId);
+            queued.reject(new Error('Request timed out for topic: ' + queued.topic));
+        }, queued.timeoutMs);
+
+        this.pendingRequests.set(messageId, {
+            resolve: queued.resolve,
+            reject: queued.reject,
+            timerId,
+        });
+
+        this.queuedRequests.delete(messageId);
+    }
+
+    startRegisterRetry() {
+        if (this.mode !== 'frame') return;
+        if (this.registerRetryTimerId) return;
+
+        this.registerRetryTimerId = globalThis.setInterval(() => {
+            if (this.shellReady || !this.started) {
+                this.stopRegisterRetry();
+                return;
+            }
+
+            this.sendControl(CONTROL_REGISTER, {
+                subscriptions: [],
+            }, 'shell');
+        }, REGISTER_RETRY_INTERVAL_MS);
+    }
+
+    stopRegisterRetry() {
+        if (!this.registerRetryTimerId) return;
+        clearInterval(this.registerRetryTimerId);
+        this.registerRetryTimerId = null;
+    }
+
+    postMessageWithLogging(message, targetWindow, targetOrigin) {
+        this.logOutgoingMessage(message, targetWindow, targetOrigin);
+        targetWindow.postMessage(message, targetOrigin);
     }
 
     resolveTargetWindow(target) {
@@ -422,12 +530,15 @@ class TrackifyBroker {
 
         if (message.type === TYPE_REQUEST) {
             this.executeRequestHandler(message, event, (responseMessage) => {
-                this.parentWindow.postMessage(responseMessage, this.targetOrigin);
+                this.postMessageWithLogging(responseMessage, this.parentWindow, this.targetOrigin);
             });
             return;
         }
 
         if (message.type === TYPE_CONTROL && message.topic === CONTROL_READY) {
+            this.shellReady = true;
+            this.stopRegisterRetry();
+            this.flushOutboundQueue();
             this.sendSubscriptionUpdate();
         }
     }
@@ -443,6 +554,12 @@ class TrackifyBroker {
 
         if (message.type === TYPE_EVENT) {
             this.dispatchLocalEvent(message);
+
+            if (message.target && message.target !== '*' && message.target !== 'shell') {
+                this.forwardEventToTarget(message);
+                return;
+            }
+
             this.forwardEventToSubscribers(message);
             return;
         }
@@ -479,7 +596,7 @@ class TrackifyBroker {
                 },
             });
 
-            event.source.postMessage(readyMessage, event.origin || '*');
+            this.postMessageWithLogging(readyMessage, event.source, event.origin || '*');
             return;
         }
 
@@ -496,7 +613,7 @@ class TrackifyBroker {
 
         if (target === 'shell') {
             this.executeRequestHandler(message, event, (responseMessage) => {
-                event.source.postMessage(responseMessage, event.origin || '*');
+                this.postMessageWithLogging(responseMessage, event.source, event.origin || '*');
             });
             return;
         }
@@ -504,14 +621,14 @@ class TrackifyBroker {
         const targetService = target === '*' ? this.requestRoutes.get(message.topic) : target;
         if (!targetService) {
             const errorMessage = this.makeErrorResponse(message, 'route_not_found', 'No target service found for request topic');
-            event.source.postMessage(errorMessage, event.origin || '*');
+            this.postMessageWithLogging(errorMessage, event.source, event.origin || '*');
             return;
         }
 
         const service = this.services.get(targetService);
         if (!service || !service.windowRef) {
             const errorMessage = this.makeErrorResponse(message, 'service_unavailable', 'Target service is not registered');
-            event.source.postMessage(errorMessage, event.origin || '*');
+            this.postMessageWithLogging(errorMessage, event.source, event.origin || '*');
             return;
         }
 
@@ -520,7 +637,7 @@ class TrackifyBroker {
             target: targetService,
         };
 
-        service.windowRef.postMessage(forwardMessage, service.origin || '*');
+        this.postMessageWithLogging(forwardMessage, service.windowRef, service.origin || '*');
     }
 
     executeRequestHandler(message, event, replyFn) {
@@ -617,8 +734,16 @@ class TrackifyBroker {
             const service = this.services.get(serviceId);
             if (!service || !service.windowRef) continue;
 
-            service.windowRef.postMessage(message, service.origin || '*');
+            this.postMessageWithLogging(message, service.windowRef, service.origin || '*');
         }
+    }
+
+    forwardEventToTarget(message) {
+        const targetService = this.services.get(message.target);
+        if (!targetService || !targetService.windowRef) return;
+        if (message.source === message.target) return;
+
+        this.postMessageWithLogging(message, targetService.windowRef, targetService.origin || '*');
     }
 
     forwardReplyToTarget(message) {
@@ -627,7 +752,7 @@ class TrackifyBroker {
         const targetService = this.services.get(message.target);
         if (!targetService || !targetService.windowRef) return;
 
-        targetService.windowRef.postMessage(message, targetService.origin || '*');
+        this.postMessageWithLogging(message, targetService.windowRef, targetService.origin || '*');
     }
 
     sendControl(topic, payload, target = 'shell') {

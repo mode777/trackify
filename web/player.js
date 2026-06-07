@@ -10,11 +10,11 @@
 
 import { createFrameBroker } from './broker.js';
 
-const SAMPLE_BASE_PATH = 'sample-files/';
 const EXT_PSX = ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'];
 const EXT_SNES = ['spc', 'rsn'];
 const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
 const EXT_N64 = ['usf', 'miniusf', 'usflib'];
+const EXT_VGM = ['vgm', 'vgz', 'cmf', 'dro'];
 
 const runtime = globalThis;
 const BACKEND_SCRIPT_BY_TYPE = {
@@ -22,6 +22,7 @@ const BACKEND_SCRIPT_BY_TYPE = {
     snes: '/wasm/backend_snes.js',
     nez: '/wasm/backend_nez.js',
     n64: '/wasm/backend_n64.js',
+    vgm: '/wasm/backend_vgm.js',
 };
 const BACKEND_LOAD_TIMEOUT_MS = 15000;
 const SEEK_POLL_MS = 250;
@@ -44,6 +45,7 @@ const els = {
     prev: document.getElementById('prevBtn'),
     play: document.getElementById('playBtn'),
     next: document.getElementById('nextBtn'),
+    thumb: document.querySelector('.thumb'),
     status: document.getElementById('status'),
     trackTitle: document.getElementById('currentTrackTitle'),
     trackMeta: document.getElementById('currentTrackMeta'),
@@ -79,6 +81,7 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
+    if (EXT_VGM.includes(ext)) return 'vgm';
     if (EXT_N64.includes(ext)) return 'n64';
     if (EXT_NEZ.includes(ext)) return 'nez';
     if (EXT_SNES.includes(ext)) return 'snes';
@@ -99,6 +102,25 @@ function updateNowPlayingMeta(track, songInfo) {
         const typeLabel = track ? (typeOf(track.file) || track.platform || '?').toUpperCase() : '?';
         els.trackMeta.textContent = game + ' - ' + typeLabel;
     }
+}
+
+function updateNowPlayingThumb(track) {
+    if (!els.thumb) return;
+
+    const coverArt = track && typeof track.coverArt === 'string' ? track.coverArt.trim() : '';
+    if (!coverArt) {
+        els.thumb.style.removeProperty('--thumb-bg');
+        return;
+    }
+
+    let resolvedCoverArt = coverArt;
+    try {
+        resolvedCoverArt = new URL(coverArt, window.location.href).toString();
+    } catch (_error) {
+        // Keep original value; CSS will ignore malformed URLs.
+    }
+
+    els.thumb.style.setProperty('--thumb-bg', 'url("' + resolvedCoverArt.replace(/"/g, '\\"') + '")');
 }
 
 function formatMs(ms) {
@@ -253,6 +275,10 @@ function installPointerStringifyShim(moduleNamespace) {
 }
 
 function getAdapterCtor(type) {
+    if (type === 'vgm') {
+        return runtime.VgmBackendAdapter ||
+            (typeof VgmBackendAdapter !== 'undefined' ? VgmBackendAdapter : null);
+    }
     if (type === 'n64') {
         return runtime.N64BackendAdapter ||
             (typeof N64BackendAdapter !== 'undefined' ? N64BackendAdapter : null);
@@ -349,6 +375,11 @@ function makeAdapter(type) {
         throw new Error(type.toUpperCase() + ' backend adapter is not available');
     }
 
+    if (type === 'vgm') {
+        installPointerStringifyShim(runtime.backend_vgmPlay);
+        return new adapterCtor('/sample-files/');
+    }
+
     if (type === 'n64') {
         installPointerStringifyShim(runtime.backend_N64);
         return new adapterCtor();
@@ -420,6 +451,7 @@ async function selectTrack(index, autoplay) {
         setStatus('Loading "' + track.title + '"...');
     }
     updateNowPlayingMeta(track, null);
+    updateNowPlayingThumb(track);
     resetSeekUi();
 
     try {
@@ -431,10 +463,11 @@ async function selectTrack(index, autoplay) {
         // tears down the previous backend pipeline before wiring up the new one.
         const adapter = makeAdapter(type);
         await runtime.ScriptNodePlayer.initialize(adapter, onTrackEnd, [], false);
-        await runtime.ScriptNodePlayer.loadMusicFromURL(SAMPLE_BASE_PATH + track.file, {});
+        await runtime.ScriptNodePlayer.loadMusicFromURL(track.file, {});
 
         const songInfo = readSongInfo();
         updateNowPlayingMeta(track, songInfo);
+        updateNowPlayingThumb(track);
         syncVolumeUiFromPlayer();
         refreshSeekUi();
 
@@ -480,7 +513,7 @@ function togglePlay() {
     setStatus(player.isPaused() ? 'Paused' : 'Playing');
 }
 
-function handlePlaylistSelected(payload) {
+function handlePlaylistSelected(payload, autoplay) {
     if (!payload || !Array.isArray(payload.tracks)) return;
 
     tracks = payload.tracks
@@ -492,11 +525,13 @@ function handlePlaylistSelected(payload) {
             platform: typeof track.platform === 'string' ? track.platform : '',
             game: typeof track.game === 'string' ? track.game : '',
             artist: typeof track.artist === 'string' ? track.artist : '',
+            coverArt: typeof track.coverArt === 'string' ? track.coverArt : '',
         }));
 
     if (!tracks.length) {
         currentIndex = -1;
         updateNowPlayingMeta(null, null);
+        updateNowPlayingThumb(null);
         setStatus('Playlist is empty');
         return;
     }
@@ -505,18 +540,17 @@ function handlePlaylistSelected(payload) {
     const boundedIndex = Math.max(0, Math.min(tracks.length - 1, preferredIndex));
     currentIndex = boundedIndex;
     updateNowPlayingMeta(tracks[currentIndex], null);
+    updateNowPlayingThumb(tracks[currentIndex]);
     setStatus('Playlist loaded');
+    if (autoplay) {
+        selectTrack(currentIndex, true);
+    }
 }
 
 function bindBrokerHandlers() {
-    broker.subscribe('playlist-selected', ({ payload }) => {
-        handlePlaylistSelected(payload);
-    });
-
-    broker.subscribe('playlist-track-selected', ({ payload }) => {
-        if (!payload || typeof payload.index !== 'number') return;
-        const autoplay = payload.autoplay !== false;
-        selectTrack(payload.index, autoplay);
+    broker.subscribe('playlist.selected', ({ payload }) => {
+        const autoplay = payload && payload.autoplay === true;
+        handlePlaylistSelected(payload, autoplay);
     });
 
     broker.subscribe('player.toggle', () => {

@@ -7,7 +7,9 @@ const require = createRequire(import.meta.url);
 const rootDir = process.cwd();
 const sampleDir = path.join(rootDir, 'sample-files');
 const indexPath = path.join(sampleDir, 'index.json');
+const gamesPath = path.join(sampleDir, 'games.json');
 const wasmDir = path.join(rootDir, 'build', 'wasm');
+const vgmIniPath = path.join(rootDir, 'submodules', 'vgmplay-0.40.9', 'src', 'VGMPlay.ini');
 
 const EXT_PLATFORM = {
 	psf: 'psx',
@@ -22,7 +24,13 @@ const EXT_PLATFORM = {
 	kss: 'nez',
 	usf: 'n64',
 	miniusf: 'n64',
+	vgm: 'vgm',
+	vgz: 'vgm',
+	cmf: 'vgm',
+	dro: 'vgm',
 };
+
+const COVER_ART_EXTENSIONS = new Set(['png', 'jpg', 'gif']);
 
 const backendCache = new Map();
 const sampleFileDataByPath = new Map();
@@ -96,6 +104,43 @@ function decodeUtf8(module, ptr) {
 	return module.UTF8ToString(ptr);
 }
 
+function decodeUtf32(module, ptr, maxLen = 256) {
+	if (!ptr) return '';
+
+	const chars = [];
+	const base = ptr >> 2;
+	for (let i = 0; i < maxLen; i += 1) {
+		const codePoint = module.HEAP32[base + i];
+		if (!codePoint) break;
+		chars.push(String.fromCodePoint(codePoint));
+	}
+
+	return chars.join('');
+}
+
+function decodePointerString(module, ptr) {
+	if (!ptr) return '';
+	if (typeof module.Pointer_stringify === 'function') {
+		return module.Pointer_stringify(ptr);
+	}
+	return decodeUtf8(module, ptr);
+}
+
+function decodeTrackField(module, ptr, encoding) {
+	if (!ptr) return '';
+	if (encoding === 'pointer') return decodePointerString(module, ptr);
+	if (encoding === 'utf8') return decodeUtf8(module, ptr);
+	if (encoding === 'utf32') return decodeUtf32(module, ptr);
+	return decodeTextFromHeap(module, ptr, encoding || 'utf-8');
+}
+
+function toTrackLength(maxPosition) {
+	const numeric = Number(maxPosition);
+	if (!Number.isFinite(numeric)) return -1;
+	const rounded = Math.trunc(numeric);
+	return rounded >= 0 ? rounded : -1;
+}
+
 function normalizeRequestName(name) {
 	return String(name).replace(/\\/g, '/').replace(/^\/+/, '');
 }
@@ -163,6 +208,22 @@ function installGlobalShims() {
 
 	if (typeof globalThis.EmsHEAP16BackendAdapter === 'undefined') {
 		globalThis.EmsHEAP16BackendAdapter = class EmsHEAP16BackendAdapter {};
+	}
+
+	if (typeof globalThis.SimpleFileMapper === 'undefined') {
+		globalThis.SimpleFileMapper = class SimpleFileMapper {
+			mapCacheFileName(name) {
+				return name;
+			}
+
+			mapUrl(filename) {
+				return filename;
+			}
+
+			registerFileData(pathFilenameArray) {
+				return pathFilenameArray;
+			}
+		};
 	}
 
 	globalThis.ScriptNodePlayer = {
@@ -264,68 +325,194 @@ async function loadBackend(platform) {
 function readTrackInfo(module, platform, fallbackTitle) {
 	const ptr = module.ccall('emu_get_track_info', 'number');
 
-	if (platform === 'psx') {
-		const attrs = module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 7);
-		const title = decodeTextFromHeap(module, attrs[0], 'shift_jis') || fallbackTitle;
+	const schemaByPlatform = {
+		psx: {
+			fields: ['title', 'artist', 'game', 'year', 'genre', 'copyright', 'psfby'],
+			decoder: 'shift_jis',
+		},
+		n64: {
+			fields: ['title', 'artist', 'game', 'year', 'genre', 'copyright', 'psfby'],
+			decoder: 'utf8',
+		},
+		snes: {
+			fields: ['title', 'artist', 'game', 'comment', 'copyright', 'dumper', 'system', 'tracks'],
+			decoder: 'pointer',
+		},
+		nez: {
+			fields: ['title', 'artist', 'copyright', 'track', 'tracks', 'detail'],
+			decoder: 'shift_jis',
+		},
+		vgm: {
+			fields: ['title', 'artist', 'game', 'notes', 'system', 'chips', 'tracks'],
+			decoders: ['utf32', 'utf32', 'utf32', 'utf32', 'utf32', 'utf8', 'utf8'],
+			decoder: 'utf8',
+		},
+	};
+
+	const schema = schemaByPlatform[platform];
+	if (!schema) {
+		const title = fallbackTitle;
 		return {
 			title,
-			artist: decodeTextFromHeap(module, attrs[1], 'shift_jis'),
-			game: decodeTextFromHeap(module, attrs[2], 'shift_jis'),
-		};
-	}
-
-	if (platform === 'n64') {
-		const attrs = module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 7);
-		const title = decodeUtf8(module, attrs[0]) || fallbackTitle;
-		return {
-			title,
-			artist: decodeUtf8(module, attrs[1]),
-			game: decodeUtf8(module, attrs[2]),
-		};
-	}
-
-	if (platform === 'snes') {
-		const attrs = module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 8);
-		const title = decodeUtf8(module, attrs[0]) || fallbackTitle;
-		return {
-			title,
-			artist: decodeUtf8(module, attrs[1]),
-			game: decodeUtf8(module, attrs[2]),
-		};
-	}
-
-	if (platform === 'nez') {
-		const attrs = module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 6);
-		const title = decodeTextFromHeap(module, attrs[0], 'shift_jis') || fallbackTitle;
-		const artist = decodeTextFromHeap(module, attrs[1], 'shift_jis');
-
-		return {
-			title,
-			artist,
+			artist: '',
 			game: '',
+			length: -1,
+			metadata: {
+				title,
+				artist: '',
+				game: '',
+			},
 		};
 	}
+
+	const attrs = module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + schema.fields.length);
+	const metadata = {};
+	for (let i = 0; i < schema.fields.length; i += 1) {
+		const fieldDecoder = Array.isArray(schema.decoders) ? schema.decoders[i] : schema.decoder;
+		metadata[schema.fields[i]] = decodeTrackField(module, attrs[i], fieldDecoder);
+	}
+
+	const title = metadata.title || fallbackTitle;
+	const artist = metadata.artist || '';
+	const game = metadata.game || '';
+	const length = toTrackLength(module.ccall('emu_get_max_position', 'number'));
+
+	metadata.title = title;
+	if (!Object.prototype.hasOwnProperty.call(metadata, 'artist')) metadata.artist = artist;
+	if (!Object.prototype.hasOwnProperty.call(metadata, 'game')) metadata.game = game;
 
 	return {
-		title: fallbackTitle,
-		artist: '',
-		game: '',
+		title,
+		artist,
+		game,
+		length,
+		metadata,
 	};
 }
 
-function buildEntry(fileRelPath, platform, metadata) {
+function buildEntry(fileRelPath, platform, metadata, coverArtByDirectory) {
 	const clean = (value) => String(value || '').replace(/[\r\n\t]+/g, ' ').trim();
+	const cleanObjectStrings = (value) => {
+		if (Array.isArray(value)) {
+			return value.map((item) => cleanObjectStrings(item));
+		}
+		if (value && typeof value === 'object') {
+			const out = {};
+			for (const [key, nested] of Object.entries(value)) {
+				out[key] = cleanObjectStrings(nested);
+			}
+			return out;
+		}
+		if (typeof value === 'string') {
+			return clean(value);
+		}
+		return value;
+	};
+
+	const trackDir = path.posix.dirname(fileRelPath);
+	const folderImages = (coverArtByDirectory && coverArtByDirectory.get(trackDir)) || [];
+	const coverArt = folderImages[0] || '';
 
 	return {
 		title: clean(metadata.title) || stripExtension(fileRelPath),
 		file: fileRelPath,
 		platform,
+		length: Number.isFinite(metadata.length) ? Math.trunc(metadata.length) : -1,
 		game: clean(metadata.game),
 		artist: clean(metadata.artist),
+		coverArt,
+		metadata: cleanObjectStrings(metadata.metadata || {}),
 	};
 }
 
-async function extractTrackMetadata(fileRelPath) {
+function extractYearFromText(value) {
+	if (typeof value !== 'string') return '';
+	const match = value.match(/\b(\d{4})\b/);
+	return match ? match[1] : '';
+}
+
+function normalizeCompanyName(value) {
+	if (typeof value !== 'string') return '';
+	let normalized = value.replace(/\b\d{4}\b/g, ' ');
+	normalized = normalized.replace(/\s+/g, ' ').trim();
+	return normalized;
+}
+
+function extractCompaniesFromCopyright(copyright) {
+	if (typeof copyright !== 'string' || !copyright.trim()) return [];
+	const parts = copyright.split(',');
+	const companies = [];
+	for (const part of parts) {
+		const company = normalizeCompanyName(part);
+		if (company) companies.push(company);
+	}
+	return [...new Set(companies)];
+}
+
+function buildCoverArtByDirectory(relativeFiles) {
+	const byDirectory = new Map();
+
+	for (const relPath of relativeFiles) {
+		const ext = getExtension(relPath);
+		if (!COVER_ART_EXTENSIONS.has(ext)) continue;
+
+		const dir = path.posix.dirname(relPath);
+		if (!byDirectory.has(dir)) {
+			byDirectory.set(dir, []);
+		}
+		byDirectory.get(dir).push(relPath);
+	}
+
+	for (const files of byDirectory.values()) {
+		files.sort((a, b) => a.localeCompare(b));
+	}
+
+	return byDirectory;
+}
+
+function buildGamesIndex(indexItems, coverArtByDirectory) {
+	const byTitle = new Map();
+
+	for (const item of indexItems) {
+		const title = String(item?.game || '').trim();
+		if (!title) continue;
+
+		const metadata = item && typeof item.metadata === 'object' && item.metadata ? item.metadata : {};
+		const metadataYear = extractYearFromText(metadata.year);
+		const copyright = typeof metadata.copyright === 'string' ? metadata.copyright : '';
+		const fallbackYear = extractYearFromText(copyright);
+		const year = metadataYear || fallbackYear;
+		const company = extractCompaniesFromCopyright(copyright);
+		const trackDir = path.posix.dirname(String(item.file || ''));
+		const folderImages = coverArtByDirectory.get(trackDir) || [];
+		const coverArt = folderImages[0] || '';
+
+		if (!byTitle.has(title)) {
+			byTitle.set(title, {
+				title,
+				year,
+				company,
+				coverArt,
+			});
+			continue;
+		}
+
+		const existing = byTitle.get(title);
+		if (!existing.year && year) {
+			existing.year = year;
+		}
+		if (company.length) {
+			existing.company = [...new Set([...existing.company, ...company])];
+		}
+		if (!existing.coverArt && coverArt) {
+			existing.coverArt = coverArt;
+		}
+	}
+
+	return [...byTitle.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+async function extractTrackMetadata(fileRelPath, coverArtByDirectory) {
 	const platform = getPlatform(fileRelPath);
 	if (!platform) return null;
 
@@ -340,13 +527,21 @@ async function extractTrackMetadata(fileRelPath) {
 	runtimeState.module = module;
 	runtimeState.currentTrackRel = fileRelPath;
 
+	if (platform === 'vgm') {
+		try {
+			module.ccall('emu_set_resource_path', null, ['string'], ['/sample-files/']);
+		} catch {
+			// Older builds may not expose resource-path support.
+		}
+	}
+
 	const inputPtr = module._malloc(data.length);
 	module.HEAPU8.set(data, inputPtr);
 	const ret = module.ccall(
 		'emu_load_file',
 		'number',
 		['string', 'number', 'number', 'number', 'number', 'number'],
-		[virtualPath, inputPtr, data.length, 48000, platform === 'nez' ? 1024 : -999, false]
+		[virtualPath, inputPtr, data.length, 48000, platform === 'nez' || platform === 'vgm' ? 1024 : -999, false]
 	);
 	module._free(inputPtr);
 
@@ -354,17 +549,40 @@ async function extractTrackMetadata(fileRelPath) {
 		throw new Error(`emu_load_file failed (${ret}) for ${fileRelPath}`);
 	}
 
-	const metadata = readTrackInfo(module, platform, stripExtension(fileRelPath));
-	module.ccall('emu_teardown', 'number');
+	try {
+		if (platform === 'snes') {
+			// Game_Music_Emu-backed SNES metadata is populated by emu_set_subsong.
+			const subsongRet = module.ccall('emu_set_subsong', 'number', ['number'], [-1]);
+			if (subsongRet !== 0) {
+				throw new Error(`emu_set_subsong failed (${subsongRet}) for ${fileRelPath}`);
+			}
+		}
 
-	return buildEntry(fileRelPath, platform, metadata);
+		if (platform === 'vgm') {
+			// VGMPlay initializes timing/chip state in emu_set_subsong.
+			const subsongRet = module.ccall('emu_set_subsong', 'number', ['number'], [0]);
+			if (subsongRet !== 0) {
+				throw new Error(`emu_set_subsong failed (${subsongRet}) for ${fileRelPath}`);
+			}
+		}
+
+		const metadata = readTrackInfo(module, platform, stripExtension(fileRelPath));
+		return buildEntry(fileRelPath, platform, metadata, coverArtByDirectory);
+	} finally {
+		try {
+			module.ccall('emu_teardown', 'number');
+		} catch {
+			// Keep indexing other files even if backend teardown fails.
+		}
+	}
 }
 
 async function main() {
 	const relativeFiles = await collectRelativeFiles(sampleDir);
 
 	for (const relPath of relativeFiles) {
-		if (relPath.toLowerCase() === 'index.json') continue;
+		const lower = relPath.toLowerCase();
+		if (lower === 'index.json' || lower === 'games.json') continue;
 
 		const fullPath = path.join(sampleDir, relPath);
 		const data = await fs.readFile(fullPath);
@@ -374,21 +592,42 @@ async function main() {
 		});
 	}
 
+	if (!sampleFileDataByPath.has('vgmplay.ini')) {
+		try {
+			const vgmIniData = await fs.readFile(vgmIniPath);
+			sampleFileDataByPath.set('vgmplay.ini', {
+				relPath: 'VGMPlay.ini',
+				data: vgmIniData,
+			});
+		} catch {
+			// Optional fallback; continue without it.
+		}
+	}
+
 	const playableFiles = relativeFiles
 		.filter((relPath) => relPath.toLowerCase() !== 'index.json')
+		.filter((relPath) => relPath.toLowerCase() !== 'games.json')
 		.filter((relPath) => getPlatform(relPath));
+	const coverArtByDirectory = buildCoverArtByDirectory(relativeFiles);
 
 	const indexItems = [];
 	for (const relPath of playableFiles) {
-		const item = await extractTrackMetadata(relPath);
-		if (item) indexItems.push(item);
+		try {
+			const item = await extractTrackMetadata(relPath, coverArtByDirectory);
+			if (item) indexItems.push(item);
+		} catch (error) {
+			process.stderr.write(`Skipping ${relPath}: ${String(error.message || error)}\n`);
+		}
 	}
 
 	indexItems.sort((a, b) => a.file.localeCompare(b.file));
+	const gamesItems = buildGamesIndex(indexItems, coverArtByDirectory);
+
 	await fs.writeFile(indexPath, `${JSON.stringify(indexItems, null, 2)}\n`, 'utf8');
+	await fs.writeFile(gamesPath, `${JSON.stringify(gamesItems, null, 2)}\n`, 'utf8');
 
 	process.stdout.write(
-		`Generated ${indexItems.length} sample entries at ${indexPath}\n`
+		`Generated ${indexItems.length} sample entries at ${indexPath} and ${gamesItems.length} game entries at ${gamesPath}\n`
 	);
 }
 

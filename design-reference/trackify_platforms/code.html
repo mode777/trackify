@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&amp;family=Inter:wght@400;500&amp;family=Geist:wght@500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:wght@100..900&amp;family=Montserrat:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "on-secondary-fixed-variant": "#004e5c",
+                  "on-primary-container": "#ede0ff",
+                  "inverse-on-surface": "#283044",
+                  "on-secondary-fixed": "#001f26",
+                  "on-primary": "#3f008e",
+                  "outline": "#958da1",
+                  "inverse-surface": "#dae2fd",
+                  "primary-container": "#7c3aed",
+                  "background": "#0b1326",
+                  "surface-dim": "#0b1326",
+                  "on-tertiary-container": "#ffdedf",
+                  "on-background": "#dae2fd",
+                  "on-primary-fixed-variant": "#5a00c6",
+                  "on-primary-fixed": "#25005a",
+                  "secondary": "#4cd7f6",
+                  "on-error-container": "#ffdad6",
+                  "surface-tint": "#d2bbff",
+                  "surface-container-highest": "#2d3449",
+                  "surface-container-low": "#131b2e",
+                  "surface-container-high": "#222a3d",
+                  "outline-variant": "#4a4455",
+                  "primary-fixed-dim": "#d2bbff",
+                  "error-container": "#93000a",
+                  "secondary-fixed-dim": "#4cd7f6",
+                  "on-surface": "#dae2fd",
+                  "tertiary-fixed-dim": "#ffb2b7",
+                  "secondary-fixed": "#acedff",
+                  "on-tertiary-fixed": "#40000d",
+                  "on-error": "#690005",
+                  "on-tertiary": "#67001b",
+                  "primary-fixed": "#eaddff",
+                  "tertiary-container": "#c81a42",
+                  "inverse-primary": "#732ee4",
+                  "on-tertiary-fixed-variant": "#92002a",
+                  "surface-bright": "#31394d",
+                  "error": "#ffb4ab",
+                  "on-secondary": "#003640",
+                  "secondary-container": "#03b5d3",
+                  "surface-container": "#171f33",
+                  "surface-variant": "#2d3449",
+                  "on-surface-variant": "#ccc3d8",
+                  "tertiary-fixed": "#ffdadb",
+                  "tertiary": "#ffb2b7",
+                  "primary": "#d2bbff",
+                  "surface": "#0b1326",
+                  "surface-container-lowest": "#060e20",
+                  "on-secondary-container": "#00424e"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.125rem",
+                  "lg": "0.25rem",
+                  "xl": "0.5rem",
+                  "full": "0.75rem"
+          },
+          "spacing": {
+                  "margin-mobile": "20px",
+                  "gutter-desktop": "24px",
+                  "unit": "8px",
+                  "gutter-mobile": "16px",
+                  "max-width": "1440px",
+                  "margin-page": "40px"
+          },
+          "fontFamily": {
+                  "label-sm": ["Geist"],
+                  "headline-md": ["Montserrat"],
+                  "body-md": ["Inter"],
+                  "body-lg": ["Inter"],
+                  "headline-lg-mobile": ["Montserrat"],
+                  "label-md": ["Geist"],
+                  "headline-xl": ["Montserrat"],
+                  "headline-lg": ["Montserrat"]
+          },
+          "fontSize": {
+                  "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                  "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                  "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                  "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                  "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                  "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                  "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                  "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-nav {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .neon-glow-primary:hover {
+      box-shadow: 0 0 15px rgba(210, 187, 255, 0.3);
+      border-color: rgba(210, 187, 255, 0.5);
+    }
+    .platform-card:hover img {
+      transform: scale(1.08);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1326;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2d3449;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7c3aed;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-primary-container selection:text-on-primary-container">
+<!-- Side Navigation -->
+<aside class="fixed h-full w-[240px] left-0 top-0 bg-surface-container-low dark:bg-surface-container-low backdrop-blur-xl border-r border-white/10 flex flex-col py-8 px-6 z-[60]">
+<div class="mb-10">
+<h1 class="font-headline-xl text-headline-xl font-extrabold text-primary-container dark:text-primary tracking-tighter">Trackify</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant/60 uppercase tracking-widest mt-1">Cyber-Orchestra Edition</p>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 text-on-surface-variant font-medium hover:bg-white/5" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 text-primary font-bold border-r-2 border-primary bg-white/5" href="#">
+<span class="material-symbols-outlined">videogame_asset</span>
+<span class="font-label-md text-label-md">Platforms</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 text-on-surface-variant font-medium hover:bg-white/5" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-md text-label-md">Composers</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 text-on-surface-variant font-medium hover:bg-white/5" href="#">
+<span class="material-symbols-outlined">library_music</span>
+<span class="font-label-md text-label-md">Your Library</span>
+</a>
+<div class="pt-6 pb-2">
+<button class="w-full py-4 bg-primary-container text-on-primary-container rounded-full font-label-md text-label-md font-bold shadow-lg shadow-primary-container/20 hover:scale-105 transition-transform">
+          Create Playlist
+        </button>
+</div>
+</nav>
+<div class="mt-auto space-y-2">
+<a class="flex items-center gap-3 py-2 px-4 rounded-xl text-on-surface-variant font-medium hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[240px] min-h-screen pb-[120px]">
+<!-- Top AppBar -->
+<header class="sticky top-0 h-16 flex justify-between items-center bg-background/80 backdrop-blur-md px-10 z-50">
+<div class="flex items-center flex-1 max-w-xl">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-high border-none rounded-full pl-12 pr-6 py-2 text-on-surface focus:ring-2 focus:ring-primary transition-all" placeholder="Search platforms, soundtracks, eras..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6 ml-6">
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container cursor-pointer active:opacity-80 transition-opacity">
+<img alt="User profile" data-alt="A professional headshot of a young gamer with subtle purple neon backlighting, reflecting the high-fidelity cyber-orchestra aesthetic of the platform. The background is a blurred dark studio with soft glowing accents of cyan and rose, creating a sophisticated and modern user profile identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuABFLD4Eby69_b0Bwwg79DmdePwtrHKhqVsyj9pGEHQNy1c8bEr6WiijTgWu13NDbMrEfu8itV6mnuM5Bdt4DArDoIyE3Iw4Jve_ruwHmKjx3egIV_RNQQvDPEc8y5ON0vN_xBvZC39cAl6PMYASIXCLS2b-1E-5rIbjLFQWUN84hcaAGbeztILPUmYpI6p423vNsDq0kr5BdFLPw0mdE9H22HgTbazw9GWB7YS4Hd6exh5hZSba5kKctTdTgRzV5k9BTQ9k-vvGSy3"/>
+</div>
+</div>
+</header>
+<div class="px-10 pt-6">
+<!-- Platforms Grid -->
+<section>
+<div class="flex justify-between items-end mb-8">
+<div>
+<h3 class="font-headline-lg text-headline-lg text-primary">Browse by Platform</h3>
+<p class="text-on-surface-variant">Select a console to explore its sonic legacy.</p>
+</div>
+<button class="text-secondary font-label-md text-label-md hover:underline decoration-2 underline-offset-4">View All Systems</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter-desktop">
+<!-- NES Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="NES" class="w-full h-full object-cover transition-transform duration-500" data-alt="A stylized 3D representation of a classic 8-bit grey and black gaming console, surrounded by floating geometric pixels in bright red and white. The background is a dark obsidian space with subtle grid lines in glowing cyan. The lighting is sharp and high-tech, evoking a retro-futuristic arcade atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNqnvF3JM2oXEt7SJkTKDRXIVi96pxN9fyjx5kwjVNT0_rAtpPwFiGo1zsm1uZv2ypt-fnzdJOPTsAZXLyy1HsBIMurU6HTAecFx5_5RPV86Ee0XazijycF1ZZUMEhmc9p0k2T9eRZAj3QAvyjhj12MwJXKYdcUzzhIX4UWIZimGXxhgmIsPO-rIwmUcozVDl9jhKP_wOplDbw3w401ppDIKAQdj7M0XM7G-itEQKqcLnNnte5wtkEuWgXPeS3nSSP1U-BXj72da4X"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">NES</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">8-Bit Era | 1985</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- SNES Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="SNES" class="w-full h-full object-cover transition-transform duration-500" data-alt="An abstract artistic rendering of 16-bit hardware components glowing with vibrant purple and magenta neon lights. Soft translucent overlays of controller shapes float in a deep charcoal void, illuminated by intense inner glows. The style is a fusion of corporate modern precision and nostalgic vaporwave vibrancy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHrrSZJRyRVV18G6h2g-C_e2FqU8qnvcvY6BEPPCbQTGoIfZTKe29XrZ0GKqpK4FNW2xIc6DzABVYlhpeOrN3MDJPWpTAkTxxkT41UXhEOlfBwWInfRw3n4WxMXTjnZ51vnHpUhtVsZ9zi8HFPwnbUZVOZ3_0HqL581IRcCsQKt4gcFrY1vgTSefuExE-YKrPkD91YdOlRbhlFNiS1_8_TMxIXWl6lpXkcDhJ9VJeoI8SbNT9aQ-2cH9erkqXQuPV4d3IgHzzXmjRp"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">SNES</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">16-Bit Era | 1991</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- PlayStation Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="PlayStation" class="w-full h-full object-cover transition-transform duration-500" data-alt="A high-fidelity 3D model of a sleek grey 32-bit disc-based console, set against a backdrop of deep blue and violet gradients. The legendary controller icons—triangle, circle, cross, square—float as glowing neon holograms around the hardware. The lighting is cinematic and moody, highlighting the tech-sophistication of the early CD-ROM era." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6XfLXUBrapufqluNW4mzFqT6cNpbZ02zAUslxjfWcGyNIa9FAdibEbRpK_6CMt78IbP-2ce0-PMQ7YytkApL_MXBAu80uRAbZ1BOZtGoHX-Wv_MR6SwIgYlFpY7gqHc70vmrIe4Y9geTIwdqWfOclbF73tABkBiYh7SBW7pYJ61nL4ceUwFlrhS7FnIQ0L_IPPoPuOQ6ZkckjSq7rqVU9kN5EOK7spNbqrJf8K2IeltL7orhHxk9QxxHJ-qwvV6R7Vb4vke2j7n2L"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">PlayStation</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">32-Bit Era | 1994</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- N64 Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="N64" class="w-full h-full object-cover transition-transform duration-500" data-alt="Bold geometric shapes resembling a trident-shaped controller and a dark grey console, set in a low-poly 3D world with vibrant primary colored light sources. The scene is illuminated with a soft gold and cobalt glow, reflecting the revolutionary 64-bit graphical transition. The mood is adventurous and high-tech, with a clean digital mystery feel." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCstYhfu19zl1jfVdJuakJ9Zpu-LhOkFgrzWCHZ2X_vMn_izxNKR2MolxpttkCch7uhQD5V6iJLF1GHIqPPg42tRbF0R4Vq56YZP6jRHAyTD_yOd0-SJNUFRH0JdwUwMxS4kyjgkJMY1hwAsLiv_noQoUVAr1-cdmLXVbLH4BJwsmX2QRCUCufA_q05lbOEo6ESYzRPScKCUnTyxfk5MELCcuSx-peXjb162FxtAuazYcp1zqPrgIkhI4tKEUIMPlqWrYX39W3V_LyL"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">N64</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">64-Bit Era | 1996</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- GameCube Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="GameCube" class="w-full h-full object-cover transition-transform duration-500" data-alt="A violet cube-shaped console rendered in a high-gloss 3D style, emitting a soft purple aura. The iconic yellow analog stick is represented by a floating golden sphere. The surrounding environment is dark and minimalist, with sharp reflections on polished surfaces, creating a premium feel for this early 2000s hardware icon." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCToMqsElbTuSs_l54CLHaAGhtGa4FV-jhwdduzys2We6Z6tlH8j2GTsp6qj9RN925IhM38O351dXN0NL9N50GtgaLVj9BfwTqf251W28hYHmHvA1cUzlzI0XdKr7JD0zHDxfohd1iQZvJFP9jK_ucVf12be2gYUj_Ph28f0AoAwKqsgBq5ay_7w-mDQMq9T3yo0MCTMcnEHfRPVc0Tkv2pWDsn1aOT1F540OBUOsQkP0c17v84Qgjno0LZvdmIeibLgyTo8xeBERP5"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">GameCube</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">128-Bit Era | 2001</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- Dreamcast Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="Dreamcast" class="w-full h-full object-cover transition-transform duration-500" data-alt="An abstract spiral logo glowing in intense orange and white against a deep navy blue background. Minimalist 3D hardware silhouettes are outlined in soft white light, suggesting the visionary but short-lived era of early online console gaming. The lighting is soft and ethereal, capturing the nostalgic and mysterious legacy of the platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMwd-Thtk2W45IeD3YBkqtOjMEbYgJeixUAlvBnHxqMFgKLVxBcHug8JxSH0pAlCoZ7HQq7Q291hb2c5KEIL9E_AlTOf3fdcvW_EXdQqksQ1xgYcF9xbt-JC_1kb8WtNHeTxU9TTDBXuBIaYgRgMYaDILaVsar-a3nolwmIs36phCKwBiK_Kl2Zf3Mr0HjShCLAehzMrp5J702t7bMqVjWE9Z7LpeYKYeII6O7ABVLoZKku0zi_PZ_-VJTlnfVOvngByp9eQRVWT1X"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">Dreamcast</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">128-Bit Era | 1998</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- Genesis Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="Genesis" class="w-full h-full object-cover transition-transform duration-500" data-alt="A sleek black 16-bit console with a metallic gold 16-BIT logo, bathed in high-contrast cyan and electric blue lighting. Sharp shadows and intense highlights emphasize the 'blast processing' marketing of the era. The scene is high-energy and stylish, with a dark obsidian floor reflecting the neon accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiTfvuLgYNaZQQJKSP_YoDkQWfcR7lUlCOOXbG69TXGNz5OcNOCFCcKeDBfqOwTFpIFAgkFPq7bwvcRv65aT3EYEbdCppw0gTAlvgcATRy_lT474mbSLuB0s2jORjWPRcbbAXAUIPi5exInvF9WNJLcoHWv3BUZUDJgN72mSkDrin2LhzoiIdbSX4HoiCHLkTSWA0pei0OiDnh45Yuobw0u8NEJz_sXJSkVkdH4bPnlZoLDni1nj4lkE1FcyCPOYEJp8p9k1OI78lQ"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">Genesis</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">16-Bit Era | 1989</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+<!-- Game Boy Card -->
+<div class="platform-card group bg-surface-container-low border border-white/5 p-4 rounded-xl transition-all duration-300 neon-glow-primary cursor-pointer">
+<div class="h-48 rounded-lg overflow-hidden bg-surface-container mb-4 relative">
+<img alt="Game Boy" class="w-full h-full object-cover transition-transform duration-500" data-alt="A classic handheld console rendered in a high-fidelity 3D style with a glowing pea-green matrix screen. The surrounding air is filled with floating 8-bit musical notes in vibrant neon green and grey. The lighting creates a sense of intimate, portable nostalgia against a dark, minimalist charcoal background with subtle depth and tonal layers." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8WJDyiBHXfGvB7BBPxSmt6BFgJ6b-qE3ZAJMRN8hU9SwHETmMTMIerwEsVRd0SzgWlAf_XeFXQxkYkmbIZpwx3mZLw6hAzQ0ez_1Gb4_jV7Y_HMvIIP0mSG-hKSyM78Ya38yZSxm1BRZmIE-QnJbEzG51zGWXwiEZFeR0tqokzVBTftsvhrxYSn5ga7GjISFPOchJ7uBQi2lSZP2jtenCPwEsNn1rvi8mwx3rY1haZOXBLOkSAyhnJLiC-3EQ7FmI6QVWsxhywyJh"/>
+<div class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">Game Boy</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Handheld | 1989</p>
+</div>
+<span class="material-symbols-outlined text-primary-container opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">arrow_forward</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Now Playing Footer -->
+<footer class="fixed bottom-0 left-0 w-full h-[90px] z-[70] bg-surface/90 backdrop-blur-2xl border-t border-white/10 shadow-2xl flex items-center justify-between px-10">
+<!-- Track Info -->
+<div class="flex items-center gap-4 w-1/3">
+<div class="w-14 h-14 rounded-lg overflow-hidden shadow-lg border border-white/10">
+<img alt="Current Track" data-alt="A stylized album art cover featuring abstract sound waves and geometric shapes in neon purple and cyan. The design is modern and high-fidelity, reflecting the premium gaming audio experience of the Trackify platform. The background is a deep obsidian with soft glowing accents that create a sense of depth and energy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJuFkUZqjX_CNInJJeeUDsNZqW2d12e_pGfgNmErrr6Axtp9BhbPNJ4a4IbDjVJMCrwZI-H_mRX-avCEbO1pjGc36V33-lDBjNrpkyee0NurSV08gIV2w2e_-v54gKBNHEP7ClXXb0VvvwXx732wL81urryQfHDssN6ssJH-oTSrhBEXfQkEnyb9ANBSBjaRN07GWF0JQTaREG50_u3G8PlaKO2r38i6kKnud69AvHlElKbn2rsDUGUyTJFhMbjzA3pwWn4DqFn0CY"/>
+</div>
+<div>
+<h5 class="font-label-md text-label-md text-on-surface font-bold">Dire, Dire Docks</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Koji Kondo — Super Mario 64</p>
+</div>
+<button class="ml-4 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">favorite</span>
+</button>
+</div>
+<!-- Controls -->
+<div class="flex flex-col items-center gap-2 w-1/3">
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">shuffle</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">skip_previous</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-white text-background flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">skip_next</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">repeat</span>
+</button>
+</div>
+<div class="flex items-center gap-3 w-full max-w-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant w-10 text-right">1:24</span>
+<div class="flex-1 h-1 bg-white/10 rounded-full relative overflow-hidden group cursor-pointer">
+<div class="absolute top-0 left-0 h-full w-[40%] bg-primary shadow-[0_0_8px_rgba(210,187,255,0.8)]" style="width: 62.9%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant w-10">3:06</span>
+</div>
+</div>
+<!-- Volume/Misc -->
+<div class="flex items-center justify-end gap-4 w-1/3">
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">lyrics</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">queue_music</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">devices</span>
+</button>
+<div class="flex items-center gap-2 w-32">
+<span class="material-symbols-outlined text-on-surface-variant">volume_up</span>
+<div class="flex-1 h-1 bg-white/10 rounded-full relative">
+<div class="absolute top-0 left-0 h-full w-[70%] bg-white/60"></div>
+</div>
+</div>
+</div>
+</footer>
+<script>
+    // Simple interactions for hover states and transitions
+    document.querySelectorAll('.platform-card').forEach(card => {
+      card.addEventListener('mouseenter', () => {
+        card.style.transform = 'translateY(-8px)';
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = 'translateY(0)';
+      });
+    });
+
+    // Mock progress bar update
+    const progressBar = document.querySelector('.flex-1.h-1.bg-white\\/10 .bg-primary');
+    let width = 62.9;
+    setInterval(() => {
+      width = (width + 0.05) % 100;
+      if (progressBar) progressBar.style.width = width + '%';
+    }, 1000);
+  </script>
+</body></html>

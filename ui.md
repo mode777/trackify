@@ -66,7 +66,7 @@ type TrackifyMessage = {
 ### 3.1 Topic Conventions
 
 - Events:
-  - `playlist-selected`
+  - `playlist.selected`
   - `content.trackSelected`
   - `player.stateChanged`
   - `playlist.finished`
@@ -78,7 +78,7 @@ type TrackifyMessage = {
   - Same `topic` as request or explicit result topic.
   - Must include `correlationId`.
 
-### 3.2 `playlist-selected` Event (Shell -> Player)
+### 3.2 `playlist.selected` Event (Shell -> Player)
 
 The shell emits this event after loading `sample-files/index.json`.
 
@@ -103,7 +103,7 @@ Event envelope example:
 ```ts
 {
   type: 'event',
-  topic: 'playlist-selected',
+  topic: 'playlist.selected',
   source: 'shell',
   target: 'player',
   payload: PlaylistSelectedEventPayload,

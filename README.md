@@ -1,7 +1,7 @@
 # Trackify — VGM Web Audio Player
 
 A clean, single-page web player for Video Game Music (VGM) files. It reuses the
-generic [`webaudio-player`](submodules/webaudio-player) engine together with three
+generic [`webaudio-player`](submodules/webaudio-player) engine together with five
 Emscripten-compiled emulator cores:
 
 | Backend | Source core | Formats | Memory |
@@ -10,6 +10,7 @@ Emscripten-compiled emulator cores:
 | **SNES** | [`websnes`](submodules/websnes) (Game Music Emu) | `.spc` | 64 MB |
 | **NEZ** | [`webnez`](submodules/webnez) (NEZplug++) | `.bgm` / `.opx` / `.nsf` / `.sng` / `.kss` | 64 MB |
 | **N64** | [`webn64`](submodules/webn64) (LazyUSF2/Mupen64plus) | `.usf` / `.miniusf` (+ `.usflib`) | 128 MB |
+| **VGM** | [`vgmplay-0.40.9`](submodules/vgmplay-0.40.9) (VGMPlay) | `.vgm` / `.vgz` / `.cmf` / `.dro` | 64 MB |
 
 The UI auto-selects the backend by file extension, decodes audio in WebAssembly,
 and streams it through a `ScriptProcessorNode` pipeline.
@@ -124,10 +125,12 @@ build/
 │   ├── backend_snes.js
 │   ├── backend_nez.js
 │   ├── backend_n64.js
+│   ├── backend_vgm.js
 │   ├── psx.wasm
 │   ├── snes.wasm
 │   ├── nez.wasm
-│   └── n64.wasm
+│   ├── n64.wasm
+│   └── vgm.wasm
 ├── web-public/
 │   ├── wasm/
 │   └── sample-files/
@@ -172,7 +175,7 @@ From the repository root:
 
 ```powershell
 emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON
-cmake --build build --target player backend_psx backend_snes backend_nez backend_n64
+cmake --build build --target player backend_psx backend_snes backend_nez backend_n64 backend_vgm
 ```
 
 ---
@@ -196,10 +199,12 @@ flowchart TD
         SNESA["SNESBackendAdapter"]
       NEZA["NEZBackendAdapter"]
       N64A["N64BackendAdapter"]
+      VGMA["VgmBackendAdapter"]
         PSXM["backend_PSX.Module<br/>psx.wasm"]
         SNESM["backend_SNES.Module<br/>snes.wasm"]
       NEZM["backend_NEZ.Module<br/>nez.wasm"]
       N64M["backend_N64.Module<br/>n64.wasm"]
+      VGMM["backend_vgmPlay.Module<br/>vgm.wasm"]
     end
 
     APP -->|initialize / loadMusicFromURL| SNP
@@ -209,10 +214,12 @@ flowchart TD
     SNESA -.->|extends| ADP
     NEZA -.->|extends| ADP
     N64A -.->|extends| ADP
+    VGMA -.->|extends| ADP
     PSXA --> PSXM
     SNESA --> SNESM
     NEZA --> NEZM
     N64A --> N64M
+    VGMA --> VGMM
 ```
 
 ### How the pieces fit together
@@ -223,13 +230,13 @@ flowchart TD
    …). It talks to a *backend adapter*.
 
 2. **A backend adapter** (`PSXBackendAdapter`, `SNESBackendAdapter`,
-  `NEZBackendAdapter`, `N64BackendAdapter`) is a thin
+  `NEZBackendAdapter`, `N64BackendAdapter`, `VgmBackendAdapter`) is a thin
    subclass of `EmsHEAP16BackendAdapter` that knows how to drive one specific
    emulator core through a small, fixed C ABI (the `emu_*` functions — load,
    teardown, compute samples, query track info, seek/position, etc.).
 
 3. **The emulator core** is the C/C++ source compiled to WebAssembly. Each core
-  is wrapped in an IIFE (`backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64`) so multiple cores can
+  is wrapped in an IIFE (`backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64` / `backend_vgmPlay`) so multiple cores can
    coexist on the same page without symbol clashes.
 
 ### The `emu_*` ABI
@@ -245,13 +252,14 @@ emu_set_subsong, emu_get_track_info,
 malloc, free
 # PSX only: emu_set_bios, emu_set_boost
 # N64 only: emu_set_boost
+# VGM only: emu_set_resource_path, emu_set_boost
 # NEZ only: emu_set_loop, emu_number_trace_streams, emu_get_trace_streams,
 #           emu_get_trace_titles, emu_force_mbm_device
 ```
 
 ### Seek behavior by backend
 
-- **PSX / SNES / N64:** seek enabled (`emu_get_current_position`,
+- **PSX / SNES / N64 / VGM:** seek enabled (`emu_get_current_position`,
   `emu_seek_position`, `emu_get_max_position` implemented).
 - **NEZ:** seek currently disabled in UI because the NEZ adapter stubs position
   APIs (`emu_get_current_position` / `emu_get_max_position` return `-1`, and
@@ -270,7 +278,7 @@ shell-pre.js  +  <emscripten-emitted>.js  +  shell-post.js  +  <core>_adapter.js
 ```
 
 - `shell-pre.js` / `shell-post.js` wrap the emitted module in the
-  `backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64` IIFE and provide the async-ready
+  `backend_PSX` / `backend_SNES` / `backend_NEZ` / `backend_N64` / `backend_vgmPlay` IIFE and provide the async-ready
   hook.
 - `<core>_adapter.js` is the per-core adapter subclass.
 
@@ -339,8 +347,17 @@ const EXT_MYCORE = ['ext1', 'ext2'];
 // ...in makeAdapter(): if (type === 'mycore') return new MyCoreBackendAdapter();
 ```
 
-And add `<script src="backend_mycore.js"></script>` to
-[`web/index.html`](web/index.html) (after `scriptprocessor_player.js`).
+In [`web/player.js`](web/player.js):
+
+```js
+const EXT_MYCORE = ['ext1', 'ext2'];
+const BACKEND_SCRIPT_BY_TYPE = {
+  // ...
+  mycore: '/wasm/backend_mycore.js',
+};
+// ...in typeOf(): if (EXT_MYCORE.includes(ext)) return 'mycore';
+// ...in getAdapterCtor()/makeAdapter(): return backend adapter instance
+```
 
 ### Porting checklist / gotchas
 
@@ -405,6 +422,19 @@ When integrating `webn64` (LazyUSF2 / Mupen64plus) with current emsdk/clang:
 - The `.miniusf` format references `.usflib` sidecar files — ensure they are
   staged alongside the music files so the runtime file mapper can resolve them.
 
+### vgmplay quirks (2026-06)
+
+When integrating `vgmplay-0.40.9` with current emsdk/clang:
+
+- Keep `callback.js` linked via `--js-library` so VGMPlay's async file requests
+  still bridge into `ScriptNodePlayer`.
+- The VGM adapter relies on `SimpleFileMapper` and `Pointer_stringify`; ensure
+  the player runtime is loaded first and keep the JS-side
+  `Module.Pointer_stringify = Module.UTF8ToString` shim for modern emsdk.
+- Preserve the original `ENABLE_ALL_CORES`, `FM_EMU`, and
+  `ADDITIONAL_FORMATS` compile definitions so `.vgm/.vgz` and auxiliary
+  formats (`.cmf`, `.dro`) remain available.
+
 ---
 
 ## Project layout
@@ -417,6 +447,7 @@ backends/
   snes/CMakeLists.txt       # SNES backend build
   nez/CMakeLists.txt        # NEZ backend build
   n64/CMakeLists.txt        # N64 backend build
+  vgm/CMakeLists.txt        # VGM backend build
 web/
   index.html • app.js • app.css
 sample-files/               # demo tracks
@@ -426,6 +457,7 @@ submodules/
   websnes/                  # SNES core (untouched)
   webnez/                   # NEZ core (untouched)
   webn64/                   # N64 core (untouched)
+  vgmplay-0.40.9/           # VGM core (untouched)
   emsdk/                    # Emscripten SDK
 ```
 

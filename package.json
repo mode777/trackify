@@ -6,8 +6,8 @@
   "scripts": {
     "clean": "rm -rf build",
     "rebuild": "npm run clean && npm run build",
-    "wasm:configure": "emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON",
-    "wasm:build": "cmake --build build --target player backend_psx backend_snes backend_nez backend_n64",
+    "wasm:configure": "./submodules/emsdk/upstream/emscripten/emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON",
+    "wasm:build": "cmake --build build --target player backend_psx backend_snes backend_nez backend_n64 backend_vgm",
     "wasm": "npm run wasm:configure && npm run wasm:build",
     "assets:prepare": "node tools/prepare-web-assets.mjs",
     "samples:index": "node tools/generate-sample-index.mjs",

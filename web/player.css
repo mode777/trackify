@@ -49,10 +49,14 @@ body {
 }
 
 .thumb {
+    --thumb-bg: radial-gradient(circle at 30% 20%, #7b8aa0, #273b53 65%, #111827);
     width: 56px;
     height: 56px;
     border-radius: 10px;
-    background: radial-gradient(circle at 30% 20%, #7b8aa0, #273b53 65%, #111827);
+    background: var(--thumb-bg);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
     flex: 0 0 auto;
 }
 

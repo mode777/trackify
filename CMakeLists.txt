@@ -87,6 +87,7 @@ add_subdirectory(backends/psx)
 add_subdirectory(backends/snes)
 add_subdirectory(backends/nez)
 add_subdirectory(backends/n64)
+add_subdirectory(backends/vgm)
 
 # ---- Stage static UI + sample files into dist/ ------------------------------
 set(_ui_files index.html app.js app.css)

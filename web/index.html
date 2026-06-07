@@ -20,9 +20,9 @@
         </div>
 
         <nav class="sidebar-nav" aria-label="Main navigation">
-            <a class="active" href="#"><span class="material-symbols-outlined">home</span>Home</a>
+            <a class="active" href="/games.html" target="content-frame"><span class="material-symbols-outlined">sports_esports</span>Games</a>
             <a href="#"><span class="material-symbols-outlined">layers</span>Platforms</a>
-            <a href="#"><span class="material-symbols-outlined">person</span>Composers</a>
+            <a href="#"><span class="material-symbols-outlined">person</span>Artists</a>
             <a href="#"><span class="material-symbols-outlined">library_music</span>Your Library</a>
         </nav>
 
@@ -32,12 +32,12 @@
         </button>
 
         <nav class="sidebar-footer" aria-label="Secondary navigation">
-            <a href="#"><span class="material-symbols-outlined">settings</span>Settings</a>
+            <a href="#" target=""><span class="material-symbols-outlined">settings</span>Settings</a>
             <a href="#"><span class="material-symbols-outlined">download</span>Downloads</a>
         </nav>
     </aside>
 
-    <main class="content-area">
+    <div class="main-shell">
         <header class="top-bar">
             <div class="top-left">
                 <div class="history-buttons" aria-hidden="true">
@@ -55,34 +55,10 @@
             </div>
         </header>
 
-        <section class="hero">
-            <div class="hero-art" aria-hidden="true">
-                <div class="hero-play"><span class="material-symbols-outlined">play_circle</span></div>
-            </div>
-            <div class="hero-text">
-                <p class="eyebrow">Album</p>
-                <h2>The Legend of Zelda: Ocarina of Time</h2>
-                <p class="meta">Nintendo <span class="dot"></span> 1998 <span class="dot"></span> Sample Playlist</p>
-            </div>
-        </section>
-
-        <section class="action-bar" aria-label="Album actions">
-            <button class="primary-action" type="button"><span class="material-symbols-outlined">play_arrow</span></button>
-            <button class="ghost-icon" type="button"><span class="material-symbols-outlined">favorite</span></button>
-            <button class="ghost-icon" type="button"><span class="material-symbols-outlined">add_circle</span></button>
-            <button class="ghost-icon" type="button"><span class="material-symbols-outlined">more_horiz</span></button>
-            <p id="status" class="shell-status">Waiting for player...</p>
-        </section>
-
-        <section class="playlist" aria-label="Track list">
-            <div class="playlist-header">
-                <span>#</span>
-                <span>Title</span>
-                <span>Type</span>
-            </div>
-            <ul id="trackList" class="track-list playlist-list"></ul>
-        </section>
-    </main>
+        <main class="content-area">
+            <iframe id="playlistFrame" class="content-frame" name="content-frame" title="Content Frame" src="/games.html" loading="eager"></iframe>
+        </main>
+    </div>
 
     <footer class="player-host">
         <iframe id="playerFrame" title="Trackify Player" src="/player.html" loading="eager"></iframe>

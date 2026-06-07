@@ -2,36 +2,36 @@
  * Trackify shell app.
  *
  * Responsibilities in this phase:
- * - Load and render playlist metadata in the shell.
- * - Publish playlist events to the player iframe service.
- * - Keep shell selection state synced with player events.
+ * - Load playlist metadata in the shell.
+ * - Publish shell events to embedded iframe services.
  */
 'use strict';
 
 import { createShellBroker } from './broker.js';
 
-const SAMPLE_INDEX_URL = 'sample-files/index.json';
+const SAMPLE_BASE_PATH = 'sample-files/';
+const SAMPLE_INDEX_URL = SAMPLE_BASE_PATH + 'index.json';
+const SAMPLE_GAMES_URL = SAMPLE_BASE_PATH + 'games.json';
 
 const EXT_PSX = ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'];
 const EXT_SNES = ['spc', 'rsn'];
 const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
 const EXT_N64 = ['usf', 'miniusf', 'usflib'];
-const PLACEHOLDER_GAME = 'Unknown game';
+const EXT_VGM = ['vgm', 'vgz', 'cmf', 'dro'];
 
-const els = {
-    list: document.getElementById('trackList'),
-    status: document.getElementById('status'),
-    playerFrame: document.getElementById('playerFrame'),
-};
+const INDEX_LOAD_ERROR_MESSAGE = 'Error loading ' + SAMPLE_INDEX_URL + ' (see console)';
+const GAMES_LOAD_ERROR_MESSAGE = 'Error loading ' + SAMPLE_GAMES_URL + ' (see console)';
 
-let tracks = [];
-let currentIndex = -1;
-let playerReady = false;
-let pendingPlayerEvents = [];
+let indexTracks = [];
+let indexLoadError = '';
+let indexLoadPromise = null;
+let games = [];
+let gamesLoadError = '';
+let gamesLoadPromise = null;
 
 const shellBroker = createShellBroker({
     serviceId: 'shell',
-    allowedServices: ['player'],
+    allowedServices: ['player', 'playlist', 'games'],
     allowedOrigins: [window.location.origin],
 });
 
@@ -41,17 +41,12 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
+    if (EXT_VGM.includes(ext)) return 'vgm';
     if (EXT_N64.includes(ext)) return 'n64';
     if (EXT_NEZ.includes(ext)) return 'nez';
     if (EXT_SNES.includes(ext)) return 'snes';
     if (EXT_PSX.includes(ext)) return 'psx';
     return null;
-}
-
-function setStatus(message) {
-    if (els.status) {
-        els.status.textContent = message;
-    }
 }
 
 function parseTracksManifest(data) {
@@ -61,12 +56,32 @@ function parseTracksManifest(data) {
     return entries
         .filter((entry) => entry && typeof entry.title === 'string' && typeof entry.file === 'string')
         .map((entry, index) => ({
+            ...entry,
             id: 'sample-' + index,
-            title: entry.title,
-            file: entry.file,
             platform: typeof entry.platform === 'string' ? entry.platform.trim() : '',
             game: typeof entry.game === 'string' ? entry.game.trim() : '',
             artist: typeof entry.artist === 'string' ? entry.artist.trim() : '',
+            file: SAMPLE_BASE_PATH + entry.file,
+            coverArt: (typeof entry.coverArt === 'string' && entry.coverArt.trim() !== '') ? SAMPLE_BASE_PATH + entry.coverArt : '',
+        }));
+}
+
+function parseGamesManifest(data) {
+    const entries = Array.isArray(data) ? data : data && Array.isArray(data.games) ? data.games : null;
+    if (!entries) throw new Error('Invalid games manifest format');
+
+    return entries
+        .filter((entry) => entry && typeof entry.title === 'string')
+        .map((entry, index) => ({
+            ...entry,
+            id: 'game-' + index,
+            title: entry.title.trim(),
+            platform: typeof entry.platform === 'string' ? entry.platform.trim() : '',
+            year: typeof entry.year === 'string' ? entry.year.trim() : '',
+            company: Array.isArray(entry.company)
+                ? entry.company.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
+                : [],
+            coverArt: (typeof entry.coverArt === 'string' && entry.coverArt.trim() !== '') ? SAMPLE_BASE_PATH + entry.coverArt : '',
         }));
 }
 
@@ -74,140 +89,135 @@ async function loadTracks() {
     const res = await fetch(SAMPLE_INDEX_URL, { cache: 'no-cache' });
     if (!res.ok) throw new Error('Failed to fetch tracks manifest: ' + res.status);
     const json = await res.json();
-    tracks = parseTracksManifest(json);
+    return parseTracksManifest(json);
 }
 
-function renderTracks() {
-    if (!els.list) return;
+async function loadGames() {
+    const res = await fetch(SAMPLE_GAMES_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error('Failed to fetch games manifest: ' + res.status);
+    const json = await res.json();
+    return parseGamesManifest(json);
+}
 
-    els.list.innerHTML = '';
-    tracks.forEach((track, index) => {
-        const li = document.createElement('li');
-        li.dataset.index = String(index);
-        if (index === currentIndex) li.classList.add('active');
+function normalizeFilterValue(value) {
+    if (typeof value !== 'string') return '';
+    return value.trim().toLowerCase();
+}
 
-        const number = document.createElement('span');
-        number.className = 'track-number';
-        number.textContent = String(index + 1);
+function filterTracks(tracks, filters) {
+    const gameFilter = normalizeFilterValue(filters && filters.game);
+    const platformFilter = normalizeFilterValue(filters && filters.platform);
 
-        const main = document.createElement('div');
-        main.className = 'track-main';
+    if (!gameFilter && !platformFilter) {
+        return tracks;
+    }
 
-        const name = document.createElement('span');
-        name.className = 'track-name';
-        name.textContent = track.title;
+    return tracks.filter((track) => {
+        const gameValue = normalizeFilterValue(track.game);
+        const platformValue = normalizeFilterValue(track.platform || typeOf(track.file));
 
-        const game = document.createElement('span');
-        game.className = 'track-artist';
-        game.textContent = track.game || PLACEHOLDER_GAME;
-
-        main.append(name, game);
-
-        const badge = document.createElement('span');
-        badge.className = 'badge';
-        badge.textContent = typeOf(track.file) || track.platform || '?';
-
-        li.append(number, main, badge);
-        li.addEventListener('click', () => {
-            currentIndex = index;
-            renderTracks();
-            publishToPlayer('playlist-track-selected', {
-                index,
-                autoplay: true,
-            });
-        });
-        els.list.appendChild(li);
+        if (gameFilter && gameValue !== gameFilter) return false;
+        if (platformFilter && platformValue !== platformFilter) return false;
+        return true;
     });
 }
 
-function queuePlayerEvent(topic, payload) {
-    pendingPlayerEvents.push({ topic, payload });
-}
+function filterGames(entries, filters) {
+    const gameFilter = normalizeFilterValue(filters && filters.game);
+    const platformFilter = normalizeFilterValue(filters && filters.platform);
 
-function flushQueuedPlayerEvents() {
-    const queued = pendingPlayerEvents;
-    pendingPlayerEvents = [];
-
-    for (const item of queued) {
-        sendEventToPlayer(item.topic, item.payload);
-    }
-}
-
-function sendEventToPlayer(topic, payload) {
-    shellBroker.publish(topic, payload, { target: 'player' });
-}
-
-function publishToPlayer(topic, payload) {
-    if (!playerReady) {
-        queuePlayerEvent(topic, payload);
-        return;
+    if (!gameFilter && !platformFilter) {
+        return entries;
     }
 
-    try {
-        sendEventToPlayer(topic, payload);
-    } catch (error) {
-        queuePlayerEvent(topic, payload);
-    }
+    return entries.filter((entry) => {
+        const gameValue = normalizeFilterValue(entry.title);
+        const platformValue = normalizeFilterValue(entry.platform || typeOf(entry.coverArt));
+
+        if (gameFilter && gameValue !== gameFilter) return false;
+        if (platformFilter && platformValue !== platformFilter) return false;
+        return true;
+    });
 }
 
-function publishPlaylistSelected() {
-    publishToPlayer('playlist-selected', {
+function makeIndexPayload(tracks, errorMessage = '') {
+    return {
         playlistId: 'sample-files-index',
         source: SAMPLE_INDEX_URL,
         selectedIndex: tracks.length > 0 ? 0 : -1,
         tracks,
-    });
+        error: errorMessage,
+    };
+}
+
+function makeGamesPayload(entries, errorMessage = '') {
+    return {
+        gamesId: 'sample-files-games',
+        source: SAMPLE_GAMES_URL,
+        selectedIndex: entries.length > 0 ? 0 : -1,
+        games: entries,
+        error: errorMessage,
+    };
+}
+
+function ensureIndexLoaded() {
+    if (indexLoadPromise) {
+        return indexLoadPromise;
+    }
+
+    indexLoadPromise = loadTracks()
+        .then((tracks) => {
+            indexTracks = tracks;
+            indexLoadError = '';
+        })
+        .catch((error) => {
+            console.error('Failed to load tracks', error);
+            indexTracks = [];
+            indexLoadError = INDEX_LOAD_ERROR_MESSAGE;
+        });
+
+    return indexLoadPromise;
+}
+
+function ensureGamesLoaded() {
+    if (gamesLoadPromise) {
+        return gamesLoadPromise;
+    }
+
+    gamesLoadPromise = loadGames()
+        .then((loadedGames) => {
+            games = loadedGames;
+            gamesLoadError = '';
+        })
+        .catch((error) => {
+            console.error('Failed to load games', error);
+            games = [];
+            gamesLoadError = GAMES_LOAD_ERROR_MESSAGE;
+        });
+
+    return gamesLoadPromise;
 }
 
 function initBroker() {
-    shellBroker.subscribe('player.ready', () => {
-        playerReady = true;
-        setStatus('Player connected');
-        flushQueuedPlayerEvents();
+    shellBroker.handleRequest('shell.queryIndex', async ({ payload }) => {
+        await ensureIndexLoaded();
+
+        const filteredTracks = filterTracks(indexTracks, payload || {});
+        return makeIndexPayload(filteredTracks, indexLoadError);
     });
+    shellBroker.handleRequest('shell.queryGames', async ({ payload }) => {
+        await ensureGamesLoaded();
 
-    shellBroker.subscribe('player.trackChanged', ({ payload }) => {
-        if (!payload || typeof payload.index !== 'number') return;
-        if (payload.index < 0 || payload.index >= tracks.length) return;
-
-        currentIndex = payload.index;
-        renderTracks();
+        const filteredGames = filterGames(games, payload || {});
+        return makeGamesPayload(filteredGames, gamesLoadError);
     });
-
-    shellBroker.subscribe('player.stateChanged', ({ payload }) => {
-        if (!payload || typeof payload.status !== 'string') return;
-        setStatus(payload.status);
-    });
-
     shellBroker.start();
 }
 
 function init() {
+    ensureIndexLoaded();
+    ensureGamesLoaded();
     initBroker();
-
-    if (els.playerFrame) {
-        els.playerFrame.addEventListener('load', () => {
-            setStatus('Waiting for player registration...');
-        });
-    }
-
-    setStatus('Loading track list...');
-    loadTracks()
-        .then(() => {
-            currentIndex = tracks.length > 0 ? 0 : -1;
-            renderTracks();
-
-            if (!tracks.length) {
-                setStatus('No tracks found in sample-files/index.json');
-                return;
-            }
-
-            publishPlaylistSelected();
-        })
-        .catch((error) => {
-            console.error('Failed to load tracks', error);
-            setStatus('Error loading sample-files/index.json (see console)');
-        });
 }
 
 if (document.readyState === 'loading') {

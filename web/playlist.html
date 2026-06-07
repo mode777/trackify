@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trackify Playlist</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&family=Inter:wght@400;500&family=Montserrat:wght@600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/app.css" />
+<link rel="stylesheet" href="/playlist.css" />
+</head>
+
+<body class="playlist-page">
+<main class="playlist-root">
+    <section class="hero">
+        <button class="hero-art" type="button" aria-label="Play selected list">
+            <div class="hero-play" aria-hidden="true"><span class="material-symbols-outlined">play_circle</span></div>
+        </button>
+        <div class="hero-text">
+            <p class="eyebrow">Game</p>
+            <h2 id="heroTitle">Title</h2>
+            <p class="meta"><span id="heroCompany">Company Name</span> <span id="heroMetaDot" class="dot"></span> <span id="heroYear">Year</span></p>
+        </div>
+    </section>
+
+    <section class="action-bar" aria-label="Album actions">
+        <button class="primary-action" type="button"><span class="material-symbols-outlined">play_arrow</span></button>
+        <button class="ghost-icon" type="button"><span class="material-symbols-outlined">favorite</span></button>
+        <button class="ghost-icon" type="button"><span class="material-symbols-outlined">add_circle</span></button>
+        <button class="ghost-icon" type="button"><span class="material-symbols-outlined">more_horiz</span></button>
+        <p id="status" class="shell-status">Waiting for library...</p>
+    </section>
+
+    <section class="playlist" aria-label="Track list">
+        <div class="playlist-header">
+            <span>#</span>
+            <span>Title</span>
+            <span>Type</span>
+        </div>
+        <ul id="trackList" class="track-list playlist-list"></ul>
+    </section>
+</main>
+
+<script type="module" src="/playlist.js"></script>
+</body>
+</html>
