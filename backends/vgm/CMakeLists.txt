@@ -3,7 +3,10 @@
 # with modernized Emscripten flags.
 
 set(VGM_ROOT "${SUBMODULES}/vgmplay-0.40.9")
+set(VGM_PATCH "${PATCHES}/vgmplay-0.40.9")
 set(VGM_EMS "${VGM_ROOT}/emscripten")
+set(VGM_EMS_PATCH "${VGM_PATCH}/emscripten")
+set(VGM_ADAPTER_SOURCE "${VGM_EMS_PATCH}/Adapter.cpp")
 set(VGM_SRC "${VGM_ROOT}/src")
 set(VGM_ZLIB "${VGM_ROOT}/3rdParty/zlib")
 
@@ -100,7 +103,7 @@ set(VGM_SOURCES
     "${VGM_SRC}/VGMPlayUI.c"
     "${VGM_SRC}/VGMPlay_AddFmts.c"
     # glue
-    "${VGM_EMS}/Adapter.cpp"
+    "${VGM_ADAPTER_SOURCE}"
     "${VGM_EMS}/MetaInfoHelper.cpp")
 
 add_executable(vgm ${VGM_SOURCES})
@@ -113,6 +116,7 @@ set_target_properties(vgm PROPERTIES
     CXX_STANDARD_REQUIRED ON)
 
 target_include_directories(vgm PRIVATE
+    "${VGM_EMS_PATCH}"
     "${VGM_EMS}"
     "${VGM_ROOT}"
     "${VGM_ZLIB}"
@@ -162,14 +166,14 @@ add_custom_command(
     OUTPUT "${VGM_BACKEND_JS}"
     COMMAND "${CMAKE_COMMAND}"
             -DOUTPUT=${VGM_BACKEND_JS}
-            "-DINPUTS=${VGM_EMS}/shell-pre.js;${CMAKE_CURRENT_BINARY_DIR}/vgm.js;${VGM_EMS}/shell-post.js;${VGM_EMS}/vgm_adapter.js"
+            "-DINPUTS=${VGM_EMS}/shell-pre.js;${CMAKE_CURRENT_BINARY_DIR}/vgm.js;${VGM_EMS}/shell-post.js;${VGM_EMS_PATCH}/vgm_adapter.js"
             -P "${CONCAT_SCRIPT}"
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${CMAKE_CURRENT_BINARY_DIR}/vgm.wasm" "${DIST_DIR}/vgm.wasm"
     DEPENDS vgm
             "${VGM_EMS}/shell-pre.js"
             "${VGM_EMS}/shell-post.js"
-            "${VGM_EMS}/vgm_adapter.js"
+            "${VGM_EMS_PATCH}/vgm_adapter.js"
             "${CONCAT_SCRIPT}"
     VERBATIM
     COMMENT "Assembling backend_vgm.js (+ vgm.wasm)")
