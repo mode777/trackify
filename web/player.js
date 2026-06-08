@@ -26,6 +26,7 @@ const BACKEND_SCRIPT_BY_TYPE = {
 };
 const BACKEND_LOAD_TIMEOUT_MS = 15000;
 const SEEK_POLL_MS = 250;
+const DEFAULT_MEDIA_SEEK_OFFSET_SEC = 10;
 
 let currentIndex = -1;
 let busy = false;
@@ -40,6 +41,87 @@ const broker = createFrameBroker({
     requestTimeoutMs: 4000,
     allowedOrigins: [window.location.origin],
 });
+
+const mediaSessionState = {
+    handlersBound: false,
+    metadataKey: '',
+    playbackState: 'none',
+    positionStateKey: '',
+};
+
+// ScriptNodePlayer drives audio via the Web Audio API, which does not expose an
+// HTMLMediaElement. Chrome only keeps the OS media controls (and Media Session)
+// alive while a media element is playing or paused, so it tears the session down
+// a few seconds after Web Audio output stops on pause. We anchor the session to
+// a silent, looping <audio> element whose play/pause state mirrors real
+// playback; pausing it (rather than stopping/removing it) keeps the OS card
+// visible just like a normal paused audio track.
+let silenceAnchorEl = null;
+let silenceAnchorUrl = '';
+
+function createSilentWavUrl() {
+    const sampleRate = 8000;
+    const numSamples = sampleRate; // 1 second of silence, looped.
+    const dataSize = numSamples; // 8-bit mono.
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    const writeString = (offset, text) => {
+        for (let i = 0; i < text.length; i++) {
+            view.setUint8(offset + i, text.charCodeAt(i));
+        }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate, true); // byteRate (sampleRate * blockAlign)
+    view.setUint16(32, 1, true); // blockAlign
+    view.setUint16(34, 8, true); // bitsPerSample
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+    for (let i = 0; i < numSamples; i++) {
+        view.setUint8(44 + i, 128); // 8-bit PCM silence midpoint
+    }
+
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    return URL.createObjectURL(blob);
+}
+
+function ensureSilenceAnchor() {
+    if (silenceAnchorEl) return silenceAnchorEl;
+
+    silenceAnchorUrl = createSilentWavUrl();
+    silenceAnchorEl = new Audio();
+    silenceAnchorEl.src = silenceAnchorUrl;
+    silenceAnchorEl.loop = true;
+    silenceAnchorEl.preload = 'auto';
+    // Must stay unmuted with non-zero volume; muted elements do not anchor a
+    // media session. The content itself is silent, so nothing is audible.
+    silenceAnchorEl.volume = 1;
+    return silenceAnchorEl;
+}
+
+function startSilenceAnchor() {
+    const el = ensureSilenceAnchor();
+    const playPromise = el.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+            // Autoplay restrictions; the next user gesture will retry.
+        });
+    }
+}
+
+function pauseSilenceAnchor() {
+    if (silenceAnchorEl) {
+        silenceAnchorEl.pause();
+    }
+}
 
 const els = {
     prev: document.getElementById('prevBtn'),
@@ -102,6 +184,8 @@ function updateNowPlayingMeta(track, songInfo) {
         const typeLabel = track ? (typeOf(track.file) || track.platform || '?').toUpperCase() : '?';
         els.trackMeta.textContent = game + ' - ' + typeLabel;
     }
+
+    syncMediaSessionMetadata(track, infoMap);
 }
 
 function updateNowPlayingThumb(track) {
@@ -121,6 +205,274 @@ function updateNowPlayingThumb(track) {
     }
 
     els.thumb.style.setProperty('--thumb-bg', 'url("' + resolvedCoverArt.replace(/"/g, '\\"') + '")');
+
+    // Keep media session artwork aligned when only cover art changed.
+    syncMediaSessionMetadata(track, normalizeInfoMap(readSongInfo()));
+}
+
+function supportsMediaSession() {
+    return typeof navigator !== 'undefined' && !!navigator.mediaSession;
+}
+
+function safeSetMediaActionHandler(action, handler) {
+    if (!supportsMediaSession()) return;
+    try {
+        navigator.mediaSession.setActionHandler(action, handler);
+    } catch (_error) {
+        // Unsupported action on this browser/OS combination.
+    }
+}
+
+function getPreferredTrackArtist(track) {
+    if (track && typeof track.artist === 'string' && track.artist.trim()) {
+        return track.artist.trim();
+    }
+
+    const infoMap = normalizeInfoMap(readSongInfo());
+    return firstInfoValue(infoMap, ['artist', 'composer', 'arranger']) || '';
+}
+
+function createMediaArtworkList(track) {
+    const coverArt = track && typeof track.coverArt === 'string' ? track.coverArt.trim() : '';
+    if (!coverArt) return [];
+
+    let src = coverArt;
+    try {
+        src = new URL(coverArt, window.location.href).toString();
+    } catch (_error) {
+        // Keep original value.
+    }
+
+    return [{ src }];
+}
+
+function buildMediaMetadataPayload(track, infoMap) {
+    const normalized = normalizeInfoMap(infoMap);
+    const title = firstInfoValue(normalized, ['title', 'song', 'track', 'name']) || (track ? track.title : 'Trackify');
+    const album = firstInfoValue(normalized, ['game', 'album', 'source']) || (track ? (track.game || '') : '');
+    const artist = firstInfoValue(normalized, ['artist', 'composer', 'arranger']) || getPreferredTrackArtist(track);
+    const artwork = createMediaArtworkList(track);
+
+    return {
+        title,
+        artist,
+        album,
+        artwork,
+    };
+}
+
+function publishMediaSessionSync(partialPayload = {}) {
+    const track = tracks[currentIndex] || null;
+    const infoMap = normalizeInfoMap(readSongInfo());
+    const metadata = buildMediaMetadataPayload(track, infoMap);
+    const player = runtime.ScriptNodePlayer.getInstance();
+    let playbackState = 'none';
+    if (player) {
+        playbackState = player.isPaused() ? 'paused' : 'playing';
+    } else if (track) {
+        // Some backends briefly drop player instance visibility while paused.
+        // Preserve a stable session state so OS media controls don't disappear.
+        playbackState = mediaSessionState.playbackState === 'playing' ? 'playing' : 'paused';
+    }
+
+    broker.publish('player.mediaSessionSync', {
+        metadata,
+        playbackState,
+        positionState: getPositionStatePayload(),
+        capabilities: {
+            hasTracks: tracks.length > 0,
+            hasCurrentTrack: !!track,
+            supportsSeekTo: !!(player && Number.isFinite(seekMaxMs) && seekMaxMs > 0),
+            supportsSeekStep: !!(player && Number.isFinite(seekMaxMs) && seekMaxMs > 0),
+            canGoNext: tracks.length > 1,
+            canGoPrevious: tracks.length > 1,
+        },
+        ...partialPayload,
+    }, { target: 'shell' });
+}
+
+function syncMediaSessionMetadata(track, infoMap) {
+    const metadata = buildMediaMetadataPayload(track, infoMap);
+    const metadataKey = JSON.stringify(metadata);
+
+    if (supportsMediaSession() && mediaSessionState.metadataKey !== metadataKey) {
+        try {
+            navigator.mediaSession.metadata = new MediaMetadata(metadata);
+            mediaSessionState.metadataKey = metadataKey;
+        } catch (_error) {
+            // Ignore metadata assignment failures.
+        }
+    }
+
+    publishMediaSessionSync({ metadata });
+}
+
+function getPositionStatePayload() {
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player || !Number.isFinite(seekMaxMs) || seekMaxMs <= 0) {
+        return null;
+    }
+
+    let position = 0;
+    try {
+        position = player.getPlaybackPosition();
+    } catch (_error) {
+        return null;
+    }
+    if (!Number.isFinite(position)) {
+        return null;
+    }
+
+    return {
+        duration: Math.max(0, seekMaxMs) / 1000,
+        playbackRate: 1,
+        position: Math.max(0, Math.min(seekMaxMs, position)) / 1000,
+    };
+}
+
+function syncMediaSessionPlaybackState(forcedState) {
+    const player = runtime.ScriptNodePlayer.getInstance();
+    const playbackState = typeof forcedState === 'string'
+        ? forcedState
+        : (player ? (player.isPaused() ? 'paused' : 'playing') : 'none');
+
+    if (supportsMediaSession() && mediaSessionState.playbackState !== playbackState) {
+        try {
+            navigator.mediaSession.playbackState = playbackState;
+            mediaSessionState.playbackState = playbackState;
+        } catch (_error) {
+            // Ignore playback state assignment failures.
+        }
+    }
+
+    publishMediaSessionSync({ playbackState });
+}
+
+function syncMediaSessionPositionState() {
+    const positionState = getPositionStatePayload();
+    const key = JSON.stringify(positionState);
+
+    if (supportsMediaSession() && positionState && mediaSessionState.positionStateKey !== key) {
+        try {
+            navigator.mediaSession.setPositionState(positionState);
+            mediaSessionState.positionStateKey = key;
+        } catch (_error) {
+            // Ignore unsupported position state updates.
+        }
+    }
+
+    publishMediaSessionSync({ positionState });
+}
+
+function playCurrentOrSelected() {
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player) {
+        if (currentIndex >= 0) {
+            selectTrack(currentIndex, true);
+        } else if (tracks.length > 0) {
+            selectTrack(0, true);
+        }
+        return;
+    }
+
+    player.play();
+    startSilenceAnchor();
+    updatePlayButton();
+    refreshSeekUi();
+    setStatus('Playing');
+    syncMediaSessionPlaybackState('playing');
+}
+
+function pausePlayback() {
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player) return;
+
+    player.pause();
+    pauseSilenceAnchor();
+    updatePlayButton();
+    refreshSeekUi();
+    setStatus('Paused');
+    syncMediaSessionPlaybackState('paused');
+}
+
+function seekRelativeBySeconds(deltaSeconds) {
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player || !Number.isFinite(deltaSeconds)) return;
+
+    let currentMs = 0;
+    try {
+        currentMs = player.getPlaybackPosition();
+    } catch (_error) {
+        return;
+    }
+    if (!Number.isFinite(currentMs)) return;
+
+    const maxMs = Number.isFinite(seekMaxMs) && seekMaxMs > 0 ? seekMaxMs : Number.POSITIVE_INFINITY;
+    const targetMs = Math.max(0, Math.min(maxMs, currentMs + deltaSeconds * 1000));
+
+    try {
+        player.seekPlaybackPosition(targetMs);
+    } catch (_error) {
+        return;
+    }
+
+    refreshSeekUi();
+    syncMediaSessionPositionState();
+}
+
+function seekToSeconds(seconds) {
+    const player = runtime.ScriptNodePlayer.getInstance();
+    if (!player || !Number.isFinite(seconds)) return;
+
+    const maxSec = Number.isFinite(seekMaxMs) && seekMaxMs > 0 ? seekMaxMs / 1000 : Number.POSITIVE_INFINITY;
+    const targetMs = Math.max(0, Math.min(maxSec, seconds)) * 1000;
+
+    try {
+        player.seekPlaybackPosition(targetMs);
+    } catch (_error) {
+        return;
+    }
+
+    refreshSeekUi();
+    syncMediaSessionPositionState();
+}
+
+function bindMediaSessionHandlers() {
+    if (!supportsMediaSession() || mediaSessionState.handlersBound) {
+        return;
+    }
+
+    safeSetMediaActionHandler('play', () => {
+        playCurrentOrSelected();
+    });
+    safeSetMediaActionHandler('pause', () => {
+        pausePlayback();
+    });
+    safeSetMediaActionHandler('previoustrack', () => {
+        if (!tracks.length) return;
+        selectTrack((currentIndex - 1 + tracks.length) % tracks.length, true);
+    });
+    safeSetMediaActionHandler('nexttrack', () => {
+        if (!tracks.length) return;
+        selectTrack((currentIndex + 1 + tracks.length) % tracks.length, true);
+    });
+    safeSetMediaActionHandler('seekbackward', (details) => {
+        const step = Number(details && details.seekOffset);
+        seekRelativeBySeconds(-(Number.isFinite(step) && step > 0 ? step : DEFAULT_MEDIA_SEEK_OFFSET_SEC));
+    });
+    safeSetMediaActionHandler('seekforward', (details) => {
+        const step = Number(details && details.seekOffset);
+        seekRelativeBySeconds(Number.isFinite(step) && step > 0 ? step : DEFAULT_MEDIA_SEEK_OFFSET_SEC);
+    });
+    safeSetMediaActionHandler('seekto', (details) => {
+        const target = Number(details && details.seekTime);
+        seekToSeconds(target);
+    });
+    safeSetMediaActionHandler('stop', () => {
+        pausePlayback();
+    });
+
+    mediaSessionState.handlersBound = true;
 }
 
 function formatMs(ms) {
@@ -263,6 +615,8 @@ function refreshSeekUi() {
     if (els.timeCurrent) {
         els.timeCurrent.textContent = formatMs(clampedPosition);
     }
+
+    syncMediaSessionPositionState();
 }
 
 // Modern Emscripten dropped Module.Pointer_stringify, but some legacy adapters
@@ -474,13 +828,17 @@ async function selectTrack(index, autoplay) {
         const player = runtime.ScriptNodePlayer.getInstance();
         if (autoplay && player) {
             player.play();
+            startSilenceAnchor();
         }
 
         updatePlayButton();
         setStatus(autoplay ? 'Playing' : 'Ready');
+        syncMediaSessionPlaybackState();
+        syncMediaSessionPositionState();
     } catch (error) {
         console.error('Failed to load track', error);
         setStatus('Error loading "' + track.title + '" (see console)');
+        syncMediaSessionPlaybackState();
     } finally {
         busy = false;
     }
@@ -504,13 +862,16 @@ function togglePlay() {
 
     if (player.isPaused()) {
         player.play();
+        startSilenceAnchor();
     } else {
         player.pause();
+        pauseSilenceAnchor();
     }
 
     updatePlayButton();
     refreshSeekUi();
     setStatus(player.isPaused() ? 'Paused' : 'Playing');
+    syncMediaSessionPlaybackState();
 }
 
 function handlePlaylistSelected(payload, autoplay) {
@@ -557,6 +918,14 @@ function bindBrokerHandlers() {
         togglePlay();
     });
 
+    broker.subscribe('player.play', () => {
+        playCurrentOrSelected();
+    });
+
+    broker.subscribe('player.pause', () => {
+        pausePlayback();
+    });
+
     broker.subscribe('player.next', () => {
         if (!tracks.length) return;
         selectTrack((currentIndex + 1 + tracks.length) % tracks.length, true);
@@ -565,6 +934,18 @@ function bindBrokerHandlers() {
     broker.subscribe('player.prev', () => {
         if (!tracks.length) return;
         selectTrack((currentIndex - 1 + tracks.length) % tracks.length, true);
+    });
+
+    broker.subscribe('player.seek.relative', ({ payload }) => {
+        const seconds = Number(payload && payload.seconds);
+        if (!Number.isFinite(seconds) || seconds === 0) return;
+        seekRelativeBySeconds(seconds);
+    });
+
+    broker.subscribe('player.seek.absolute', ({ payload }) => {
+        const seconds = Number(payload && payload.seconds);
+        if (!Number.isFinite(seconds)) return;
+        seekToSeconds(seconds);
     });
 }
 
@@ -636,6 +1017,7 @@ function bindUiHandlers() {
 function init() {
     bindBrokerHandlers();
     bindUiHandlers();
+    bindMediaSessionHandlers();
 
     broker.start();
     broker.publish('player.ready', {
@@ -645,6 +1027,9 @@ function init() {
     updatePlayButton();
     resetSeekUi();
     setStatus('Waiting for playlist...');
+    syncMediaSessionMetadata(null, null);
+    syncMediaSessionPlaybackState();
+    publishMediaSessionSync();
 
     setInterval(refreshSeekUi, SEEK_POLL_MS);
 }
