@@ -2,7 +2,7 @@
 
 A clean, single-page web player for Video Game Music (VGM) files. It reuses the
 generic [`webaudio-player`](submodules/webaudio-player) engine together with five
-Emscripten-compiled emulator cores:
+Emscripten-compiled emulator cores and one pure-JavaScript XA decoder:
 
 | Backend | Source core | Formats | Memory |
 | ------- | ----------- | ------- | ------ |
@@ -11,6 +11,7 @@ Emscripten-compiled emulator cores:
 | **NEZ** | [`webnez`](submodules/webnez) (NEZplug++) | `.bgm` / `.opx` / `.nsf` / `.sng` / `.kss` | 64 MB |
 | **N64** | [`webn64`](submodules/webn64) (LazyUSF2/Mupen64plus) | `.usf` / `.miniusf` (+ `.usflib`) | 128 MB |
 | **VGM** | [`vgmplay-0.40.9`](submodules/vgmplay-0.40.9) (VGMPlay) | `.vgm` / `.vgz` / `.cmf` / `.dro` | 64 MB |
+| **XA** | Native JS decoder | `.xa` | n/a |
 
 The UI auto-selects the backend by file extension, decodes audio in WebAssembly,
 and streams it through a `ScriptProcessorNode` pipeline.
@@ -126,6 +127,7 @@ build/
 │   ├── backend_nez.js
 │   ├── backend_n64.js
 │   ├── backend_vgm.js
+│   ├── backend_xa.js
 │   ├── psx.wasm
 │   ├── snes.wasm
 │   ├── nez.wasm

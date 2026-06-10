@@ -15,6 +15,7 @@ const EXT_SNES = ['spc', 'rsn'];
 const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
 const EXT_N64 = ['usf', 'miniusf', 'usflib'];
 const EXT_VGM = ['vgm', 'vgz', 'cmf', 'dro'];
+const EXT_XA = ['xa'];
 
 const runtime = globalThis;
 const BACKEND_SCRIPT_BY_TYPE = {
@@ -23,6 +24,7 @@ const BACKEND_SCRIPT_BY_TYPE = {
     nez: '/wasm/backend_nez.js',
     n64: '/wasm/backend_n64.js',
     vgm: '/wasm/backend_vgm.js',
+    xa: '/wasm/backend_xa.js',
 };
 const BACKEND_LOAD_TIMEOUT_MS = 15000;
 const SEEK_POLL_MS = 250;
@@ -163,6 +165,7 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
+    if (EXT_XA.includes(ext)) return 'xa';
     if (EXT_VGM.includes(ext)) return 'vgm';
     if (EXT_N64.includes(ext)) return 'n64';
     if (EXT_NEZ.includes(ext)) return 'nez';
@@ -629,6 +632,10 @@ function installPointerStringifyShim(moduleNamespace) {
 }
 
 function getAdapterCtor(type) {
+    if (type === 'xa') {
+        return runtime.XaBackendAdapter ||
+            (typeof XaBackendAdapter !== 'undefined' ? XaBackendAdapter : null);
+    }
     if (type === 'vgm') {
         return runtime.VgmBackendAdapter ||
             (typeof VgmBackendAdapter !== 'undefined' ? VgmBackendAdapter : null);

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Trackify web tooling orchestration (Vite + CMake artifacts)",
   "scripts": {
+    "emsdk:env": "call .\\submodules\\emsdk\\emsdk_env.bat && emcc --version",
     "clean": "rm -rf build",
     "rebuild": "npm run clean && npm run build",
     "wasm:configure": "emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON",

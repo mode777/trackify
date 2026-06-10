@@ -7,6 +7,7 @@ const publicDir = path.join(root, 'build', 'web-public');
 const publicWasmDir = path.join(publicDir, 'wasm');
 const sourceSamplesDir = path.join(root, 'sample-files');
 const publicSamplesDir = path.join(publicDir, 'sample-files');
+const xaBackendSourceFile = path.join(root, 'web', 'backend_xa.js');
 
 const requiredRuntimeFiles = [
   'scriptprocessor_player.js',
@@ -53,6 +54,11 @@ async function copyRuntimeArtifacts() {
       path.join(publicWasmDir, fileName)
     );
   }
+
+  await fs.copyFile(
+    xaBackendSourceFile,
+    path.join(publicWasmDir, 'backend_xa.js')
+  );
 }
 
 async function copySampleFiles() {

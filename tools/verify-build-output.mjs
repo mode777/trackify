@@ -12,6 +12,7 @@ const required = [
   'wasm/backend_nez.js',
   'wasm/backend_n64.js',
   'wasm/backend_vgm.js',
+  'wasm/backend_xa.js',
   'wasm/psx.wasm',
   'wasm/snes.wasm',
   'wasm/nez.wasm',

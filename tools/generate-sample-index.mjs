@@ -1,15 +1,18 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
-const rootDir = process.cwd();
-const sampleDir = path.join(rootDir, 'sample-files');
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const scriptRootDir = path.resolve(scriptDir, '..');
+const cwdRootDir = process.cwd();
+const sampleDir = path.join(cwdRootDir, 'sample-files');
 const indexPath = path.join(sampleDir, 'index.json');
 const gamesPath = path.join(sampleDir, 'games.json');
-const wasmDir = path.join(rootDir, 'build', 'wasm');
-const vgmIniPath = path.join(rootDir, 'submodules', 'vgmplay-0.40.9', 'src', 'VGMPlay.ini');
+const wasmDir = path.join(scriptRootDir, 'build', 'wasm');
+const vgmIniPath = path.join(scriptRootDir, 'submodules', 'vgmplay-0.40.9', 'src', 'VGMPlay.ini');
 
 const EXT_PLATFORM = {
 	psf: 'psx',
@@ -28,6 +31,7 @@ const EXT_PLATFORM = {
 	vgz: 'vgm',
 	cmf: 'vgm',
 	dro: 'vgm',
+	xa: 'xa',
 };
 
 const COVER_ART_EXTENSIONS = new Set(['png', 'jpg', 'gif']);
@@ -58,6 +62,20 @@ function stripExtension(fileRelPath) {
 	const base = path.basename(fileRelPath);
 	const ext = path.extname(base);
 	return ext ? base.slice(0, -ext.length) : base;
+}
+
+function buildTrackId(fileRelPath) {
+	const normalizedPath = normalizeRequestName(fileRelPath);
+	const dottedPath = normalizedPath.replace(/[\\/]+/g, '.');
+	const lowered = dottedPath.toLowerCase();
+	const dashed = lowered.replace(/\s+/g, '-');
+	const sanitized = dashed.replace(/[^a-z0-9.-]/g, '');
+
+	return sanitized
+		.replace(/\.{2,}/g, '.')
+		.replace(/-{2,}/g, '-')
+		.replace(/^\.+|\.+$/g, '')
+		.replace(/^-+|-+$/g, '');
 }
 
 async function collectRelativeFiles(baseDir) {
@@ -412,16 +430,23 @@ function buildEntry(fileRelPath, platform, metadata, coverArtByDirectory) {
 	const trackDir = path.posix.dirname(fileRelPath);
 	const folderImages = (coverArtByDirectory && coverArtByDirectory.get(trackDir)) || [];
 	const coverArt = folderImages[0] || '';
+	const cleanedMetadata = cleanObjectStrings(metadata.metadata || {});
+	const game = clean(metadata.game) || 'Unknown Game';
+
+	if (!clean(cleanedMetadata.game)) {
+		cleanedMetadata.game = game;
+	}
 
 	return {
+		id: buildTrackId(fileRelPath),
 		title: clean(metadata.title) || stripExtension(fileRelPath),
 		file: fileRelPath,
 		platform,
 		length: Number.isFinite(metadata.length) ? Math.trunc(metadata.length) : -1,
-		game: clean(metadata.game),
+		game,
 		artist: clean(metadata.artist),
 		coverArt,
-		metadata: cleanObjectStrings(metadata.metadata || {}),
+		metadata: cleanedMetadata,
 	};
 }
 
@@ -470,6 +495,66 @@ function buildCoverArtByDirectory(relativeFiles) {
 	return byDirectory;
 }
 
+function isUnknownGameName(value) {
+	const normalized = String(value || '').trim().toLowerCase();
+	return !normalized || normalized === 'unknown game';
+}
+
+function normalizeFolderGameName(trackDir) {
+	if (!trackDir || trackDir === '.') return 'Unknown Game';
+
+	const folder = path.posix.basename(trackDir).replace(/-/g, ' ').trim();
+	if (!folder) return 'Unknown Game';
+
+	return folder
+		.split(/\s+/)
+		.map((word) => (word ? `${word[0].toUpperCase()}${word.slice(1)}` : ''))
+		.join(' ')
+		.trim();
+}
+
+function resolveUnknownGameNames(indexItems) {
+	const knownNamesByDirectory = new Map();
+
+	for (const item of indexItems) {
+		const trackDir = path.posix.dirname(String(item.file || ''));
+		const game = String(item.game || '').trim();
+		if (isUnknownGameName(game)) continue;
+
+		if (!knownNamesByDirectory.has(trackDir)) {
+			knownNamesByDirectory.set(trackDir, new Map());
+		}
+
+		const directoryGames = knownNamesByDirectory.get(trackDir);
+		directoryGames.set(game, (directoryGames.get(game) || 0) + 1);
+	}
+
+	for (const item of indexItems) {
+		if (!isUnknownGameName(item.game)) continue;
+
+		const trackDir = path.posix.dirname(String(item.file || ''));
+		const knownGames = knownNamesByDirectory.get(trackDir);
+		let resolvedGame = '';
+
+		if (knownGames && knownGames.size > 0) {
+			const ranked = [...knownGames.entries()].sort((a, b) => {
+				if (b[1] !== a[1]) return b[1] - a[1];
+				return a[0].localeCompare(b[0]);
+			});
+			resolvedGame = ranked[0]?.[0] || '';
+		}
+
+		if (!resolvedGame) {
+			resolvedGame = normalizeFolderGameName(trackDir);
+		}
+
+		item.game = resolvedGame;
+		if (item.metadata && typeof item.metadata === 'object') {
+			item.metadata.game = resolvedGame;
+		}
+	}
+}
+
 function buildGamesIndex(indexItems, coverArtByDirectory) {
 	const byTitle = new Map();
 
@@ -515,6 +600,27 @@ function buildGamesIndex(indexItems, coverArtByDirectory) {
 async function extractTrackMetadata(fileRelPath, coverArtByDirectory) {
 	const platform = getPlatform(fileRelPath);
 	if (!platform) return null;
+
+	if (platform === 'xa') {
+		const title = stripExtension(fileRelPath);
+		return buildEntry(
+			fileRelPath,
+			platform,
+			{
+				title,
+				artist: '',
+				game: '',
+				length: -1,
+				metadata: {
+					title,
+					artist: '',
+					game: '',
+					detail: 'XA ADPCM',
+				},
+			},
+			coverArtByDirectory
+		);
+	}
 
 	const module = await loadBackend(platform);
 	const data = sampleFileDataByPath.get(fileRelPath.toLowerCase())?.data;
@@ -619,6 +725,8 @@ async function main() {
 			process.stderr.write(`Skipping ${relPath}: ${String(error.message || error)}\n`);
 		}
 	}
+
+	resolveUnknownGameNames(indexItems);
 
 	indexItems.sort((a, b) => a.file.localeCompare(b.file));
 	const gamesItems = buildGamesIndex(indexItems, coverArtByDirectory);
