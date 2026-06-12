@@ -13,9 +13,13 @@
     "assets:prepare": "node tools/prepare-web-assets.mjs",
     "samples:index": "node tools/generate-sample-index.mjs",
     "samples:coverart": "node tools/fetch-missing-cover-art.mjs",
+    "pocketbase:download": "node tools/download-pocketbase.mjs",
+    "pocketbase:serve": "node tools/serve-pocketbase.mjs",
     "dev": "npm run wasm && npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "dev-js": "npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "build": "npm run wasm && npm run assets:prepare && vite build",
+    "build:watch": "npm run wasm && npm run assets:prepare && vite build --watch",
+    "build:watch-js": "npm run assets:prepare && vite build --watch",
     "preview": "vite preview --host 127.0.0.1 --port 8137",
     "verify:dist": "node tools/verify-build-output.mjs"
   },

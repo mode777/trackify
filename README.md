@@ -159,6 +159,8 @@ Then open `http://127.0.0.1:8137/`.
 npm run wasm         # only configure/build CMake runtime artifacts
 npm run samples:index # rebuild sample-files/index.json and sample-files/games.json
 npm run samples:coverart # fetch/link missing cover art and update sample-files/games.json
+npm run build:watch  # build to build/dist and watch for web JS/HTML/CSS changes
+npm run build:watch-js # same as above but skips WASM rebuild
 npm run preview      # preview the production build
 npm run verify:dist  # assert required runtime files exist in build/dist
 ```

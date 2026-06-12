@@ -28,3 +28,7 @@ Thumbs.db
 
 # Node / web tooling
 node_modules/
+
+bin/
+
+/pb_data/

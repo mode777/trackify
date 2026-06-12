@@ -2,13 +2,16 @@ import path from 'node:path';
 import { defineConfig } from 'vite';
 
 const rootDir = path.resolve(process.cwd(), 'web');
+const isWatchBuild = process.argv.includes('--watch');
 
 export default defineConfig({
   root: rootDir,
   publicDir: path.resolve(process.cwd(), 'build/web-public'),
   build: {
     outDir: path.resolve(process.cwd(), 'build/dist'),
-    emptyOutDir: true,
+    // Preserve existing build outputs while watching to keep iterative rebuilds stable.
+    emptyOutDir: !isWatchBuild,
+    watch: isWatchBuild ? {} : null,
     rollupOptions: {
       input: {
         main: path.resolve(rootDir, 'index.html'),
