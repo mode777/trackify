@@ -157,9 +157,56 @@ Then open `http://127.0.0.1:8137/`.
 
 ```bash
 npm run wasm         # only configure/build CMake runtime artifacts
+npm run samples:index # rebuild sample-files/index.json and sample-files/games.json
+npm run samples:coverart # fetch/link missing cover art and update sample-files/games.json
 npm run preview      # preview the production build
 npm run verify:dist  # assert required runtime files exist in build/dist
 ```
+
+### Optional: fetch missing cover art after indexing
+
+Cover fetching is a separate step. First generate manifests, then run the
+cover-art script, which reads existing sample-files/index.json +
+sample-files/games.json, downloads missing covers into game folders, and updates
+sample-files/games.json.
+
+```bash
+# Step 1: rebuild manifests
+npm run samples:index
+
+# Step 2 dry-run: lookup only, no files written
+TRACKIFY_FETCH_COVER_ART_DRY_RUN=1 npm run samples:coverart
+
+# Step 2 download: fetch missing covers and update games.json
+npm run samples:coverart
+```
+
+Environment flags:
+
+- TRACKIFY_FETCH_COVER_ART_DRY_RUN: print matches without writing files (1 to enable)
+- TRACKIFY_FETCH_COVER_ART_MAX_PER_RUN: cap downloads per run (default 25)
+- TRACKIFY_FETCH_COVER_ART_TIMEOUT_MS: per-request timeout in ms (default 8000)
+- TRACKIFY_FETCH_COVER_ART_REQUEST_DELAY_MS: delay between MediaWiki requests in
+  ms (default 250)
+- TRACKIFY_FETCH_COVER_ART_RETRY_MAX_ATTEMPTS: maximum retries for rate-limited
+  lookup requests (default 4)
+- TRACKIFY_FETCH_COVER_ART_RETRY_BASE_DELAY_MS: base backoff delay for HTTP 429
+  retries in ms (default 1000; exponential 1x, 2x, 4x, ... when Retry-After is
+  not provided)
+- TRACKIFY_FETCH_COVER_ART_MAX_BYTES: max downloaded image size (default 5242880)
+- TRACKIFY_FETCH_COVER_ART_ALLOW_NON_COMMONS: allow non-Commons Wikipedia image
+  URLs (enabled by default; set to 0 to restrict to Wikimedia Commons-hosted
+  assets only).
+- TRACKIFY_FETCH_COVER_ART_INSECURE_TLS: disable TLS certificate verification for
+  remote cover fetch requests. Enabled by default; set to 0 to enforce TLS
+  certificate verification.
+
+Lookup behavior:
+
+- The cover-art fetcher first tries Wikipedia summary metadata.
+- If no image is found, it falls back to MediaWiki page-image API.
+- If API lookups still fail, it scrapes the game page infobox image as a final
+  fallback.
 
 ### Legacy CMake-only mode (optional)
 

@@ -12,6 +12,7 @@
     "wasm": "npm run wasm:configure && npm run wasm:build",
     "assets:prepare": "node tools/prepare-web-assets.mjs",
     "samples:index": "node tools/generate-sample-index.mjs",
+    "samples:coverart": "node tools/fetch-missing-cover-art.mjs",
     "dev": "npm run wasm && npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "dev-js": "npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "build": "npm run wasm && npm run assets:prepare && vite build",

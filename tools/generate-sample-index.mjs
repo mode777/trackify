@@ -34,7 +34,7 @@ const EXT_PLATFORM = {
 	xa: 'xa',
 };
 
-const COVER_ART_EXTENSIONS = new Set(['png', 'jpg', 'gif']);
+const COVER_ART_EXTENSIONS = new Set(['png', 'jpg', 'gif', 'webp']);
 
 const backendCache = new Map();
 const sampleFileDataByPath = new Map();
@@ -44,6 +44,10 @@ const runtimeState = {
 	currentTrackRel: '',
 };
 const debug = process.env.TRACKIFY_INDEX_DEBUG === '1';
+
+function logInfo(message) {
+	process.stdout.write(`[trackify-index] ${message}\n`);
+}
 
 function toPosixPath(value) {
 	return value.split(path.sep).join('/');
@@ -684,8 +688,13 @@ async function extractTrackMetadata(fileRelPath, coverArtByDirectory) {
 }
 
 async function main() {
-	const relativeFiles = await collectRelativeFiles(sampleDir);
+	logInfo(`Starting sample index generation from ${sampleDir}`);
 
+	const relativeFiles = await collectRelativeFiles(sampleDir);
+	logInfo(`Discovered ${relativeFiles.length} files under sample-files.`);
+	logInfo('Loading sample files into memory...');
+
+	let loadedFileCount = 0;
 	for (const relPath of relativeFiles) {
 		const lower = relPath.toLowerCase();
 		if (lower === 'index.json' || lower === 'games.json') continue;
@@ -696,7 +705,9 @@ async function main() {
 			relPath,
 			data,
 		});
+		loadedFileCount += 1;
 	}
+	logInfo(`Loaded ${loadedFileCount} files into cache.`);
 
 	if (!sampleFileDataByPath.has('vgmplay.ini')) {
 		try {
@@ -705,8 +716,10 @@ async function main() {
 				relPath: 'VGMPlay.ini',
 				data: vgmIniData,
 			});
+			logInfo('Loaded VGMPlay.ini fallback resource.');
 		} catch {
 			// Optional fallback; continue without it.
+			logInfo('VGMPlay.ini fallback resource not found; continuing without it.');
 		}
 	}
 
@@ -715,9 +728,12 @@ async function main() {
 		.filter((relPath) => relPath.toLowerCase() !== 'games.json')
 		.filter((relPath) => getPlatform(relPath));
 	const coverArtByDirectory = buildCoverArtByDirectory(relativeFiles);
+	logInfo(`Found ${playableFiles.length} playable files across ${coverArtByDirectory.size} cover-art directories.`);
 
 	const indexItems = [];
-	for (const relPath of playableFiles) {
+	for (let i = 0; i < playableFiles.length; i += 1) {
+		const relPath = playableFiles[i];
+		logInfo(`Metadata [${i + 1}/${playableFiles.length}] ${relPath}`);
 		try {
 			const item = await extractTrackMetadata(relPath, coverArtByDirectory);
 			if (item) indexItems.push(item);
@@ -725,12 +741,16 @@ async function main() {
 			process.stderr.write(`Skipping ${relPath}: ${String(error.message || error)}\n`);
 		}
 	}
+	logInfo(`Metadata extraction complete. Indexed ${indexItems.length} tracks.`);
 
+	logInfo('Resolving unknown game names...');
 	resolveUnknownGameNames(indexItems);
 
 	indexItems.sort((a, b) => a.file.localeCompare(b.file));
 	const gamesItems = buildGamesIndex(indexItems, coverArtByDirectory);
+	logInfo(`Built games index with ${gamesItems.length} unique game entries.`);
 
+	logInfo('Writing output files...');
 	await fs.writeFile(indexPath, `${JSON.stringify(indexItems, null, 2)}\n`, 'utf8');
 	await fs.writeFile(gamesPath, `${JSON.stringify(gamesItems, null, 2)}\n`, 'utf8');
 
