@@ -1,0 +1,44 @@
+/// <reference path="../pb_data/types.d.ts" />
+migrate((app) => {
+  const collection = app.findCollectionByNameOrId("pbc_879072730")
+
+  // update field
+  collection.fields.addAt(0, new Field({
+    "autogeneratePattern": "",
+    "help": "",
+    "hidden": false,
+    "id": "text3208210256",
+    "max": 64,
+    "min": 15,
+    "name": "id",
+    "pattern": ".+$",
+    "presentable": false,
+    "primaryKey": true,
+    "required": true,
+    "system": true,
+    "type": "text"
+  }))
+
+  return app.save(collection)
+}, (app) => {
+  const collection = app.findCollectionByNameOrId("pbc_879072730")
+
+  // update field
+  collection.fields.addAt(0, new Field({
+    "autogeneratePattern": "",
+    "help": "",
+    "hidden": false,
+    "id": "text3208210256",
+    "max": 15,
+    "min": 15,
+    "name": "id",
+    "pattern": ".+$",
+    "presentable": false,
+    "primaryKey": true,
+    "required": true,
+    "system": true,
+    "type": "text"
+  }))
+
+  return app.save(collection)
+})
