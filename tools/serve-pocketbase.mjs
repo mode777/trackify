@@ -10,7 +10,7 @@ const isWindows = process.platform === 'win32';
 const ext = isWindows ? '.exe' : '';
 const pocketbasePath = join(__dirname, '..', 'bin', `pocketbase${ext}`);
 
-const result = spawnSync(pocketbasePath, ['serve', '--publicDir', './build/dist', '--dir', './pb_data'], {
+const result = spawnSync(pocketbasePath, ['serve', '--publicDir', './build/dist', '--dir', './pb_data', '--hooksDir', './pb_hooks'], {
   stdio: 'inherit',
   cwd: join(__dirname, '..')
 });

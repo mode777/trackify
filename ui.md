@@ -80,17 +80,16 @@ type TrackifyMessage = {
 
 ### 3.2 `playlist.selected` Event (Shell -> Player)
 
-The shell emits this event after loading `sample-files/index.json`.
+The shell emits this event after loading a track-catalog payload.
 
 ```ts
 type PlaylistSelectedEventPayload = {
-  playlistId: string;           // Example: 'sample-files-index'
-  source: string;               // Example: 'sample-files/index.json'
+  source: string;               // Example: 'tracks/index.json' or a backend endpoint
   selectedIndex: number;        // Initial selection, -1 when playlist is empty
   tracks: Array<{
     id: string;                 // Shell-assigned stable id, e.g. 'sample-0'
     title: string;
-    file: string;               // Path relative to sample-files/
+    file: string;               // Backend-resolvable track path
     platform: string;           // e.g. 'psx', 'snes', 'nez', 'n64'
     game: string;
     artist: string;

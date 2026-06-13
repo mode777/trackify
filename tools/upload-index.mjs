@@ -2,12 +2,13 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import PocketBase from 'pocketbase';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.join(__dirname, '..');
-const sampleFilesDir = path.join(repoRoot, 'sample-files');
+const cwdRootDir = process.cwd();
+const DEFAULT_SAMPLE_DIR = 'sample-files';
+const sampleDirArg = process.argv[2];
+const sampleFilesDirName = sampleDirArg && sampleDirArg.trim() ? sampleDirArg.trim() : DEFAULT_SAMPLE_DIR;
+const sampleFilesDir = path.resolve(cwdRootDir, sampleFilesDirName);
 
 const indexPath = path.join(sampleFilesDir, 'index.json');
 const gamesPath = path.join(sampleFilesDir, 'games.json');
@@ -18,6 +19,10 @@ const dryRun = process.env.TRACKIFY_PB_UPLOAD_DRY_RUN === '1';
 
 function normalizeString(value) {
   return String(value ?? '').trim();
+}
+
+function toPosixPath(value) {
+  return value.split(path.sep).join('/');
 }
 
 function normalizeCompany(value) {
@@ -63,7 +68,44 @@ function getCoverFilename(existingRecord) {
   return '';
 }
 
-async function buildCoverFile(relativePath) {
+function getFileFieldValues(existingRecord, fieldName) {
+  const value = existingRecord?.[fieldName];
+
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === 'string' && entry.length > 0);
+  }
+
+  if (typeof value === 'string' && value.length > 0) {
+    return [value];
+  }
+
+  return [];
+}
+
+function stripPocketBaseFileSuffix(fileName) {
+  const normalized = path.basename(normalizeString(fileName));
+  if (!normalized) {
+    return '';
+  }
+
+  const extension = path.extname(normalized);
+  const stem = extension ? normalized.slice(0, -extension.length) : normalized;
+  const strippedStem = stem.replace(/_[a-z0-9]{10}$/i, '');
+  return `${strippedStem}${extension}`;
+}
+
+function toComparableFileName(fileName) {
+  return stripPocketBaseFileSuffix(fileName).toLowerCase();
+}
+
+function normalizeComparableFileNameList(fileNames) {
+  return fileNames
+    .map((fileName) => toComparableFileName(fileName))
+    .filter((fileName) => fileName.length > 0)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+async function buildSampleFile(relativePath, options = {}) {
   if (!relativePath) {
     return null;
   }
@@ -77,38 +119,78 @@ async function buildCoverFile(relativePath) {
 
   try {
     const fileBuffer = await fs.readFile(absolutePath);
-    const fileName = path.basename(normalizedRelativePath);
+    const fileName = normalizeString(options.fileName) || path.basename(normalizedRelativePath);
+    if (options.type) {
+      return new File([fileBuffer], fileName, { type: options.type });
+    }
     return new File([fileBuffer], fileName);
   } catch (error) {
     process.stdout.write(
-      `WARN: coverArt file missing for ${normalizedRelativePath}: ${String(error.message || error)}\n`
+      `WARN: sample file missing for ${normalizedRelativePath}: ${String(error.message || error)}\n`
     );
     return null;
   }
 }
 
-async function buildTrackFile(relativePath) {
-  if (!relativePath) {
-    return null;
+async function buildCoverFile(relativePath) {
+  return buildSampleFile(relativePath);
+}
+
+async function collectRelativeFiles(baseDir) {
+  const out = [];
+
+  async function walk(currentDir) {
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile()) {
+        out.push(toPosixPath(path.relative(baseDir, fullPath)));
+      }
+    }
   }
 
-  const normalizedRelativePath = normalizeString(relativePath);
-  if (!normalizedRelativePath) {
-    return null;
+  await walk(baseDir);
+  return out;
+}
+
+async function collectGameDirectoryFiles(gameDirectory, excludedRelativePath) {
+  const normalizedDirectory = normalizeString(gameDirectory);
+  if (!normalizedDirectory) {
+    return [];
   }
 
-  const absolutePath = path.join(sampleFilesDir, normalizedRelativePath);
+  const absoluteDirectory = path.join(sampleFilesDir, normalizedDirectory);
+  const normalizedExcludedPath = normalizeString(excludedRelativePath);
 
   try {
-    const fileBuffer = await fs.readFile(absolutePath);
-    const fileName = path.basename(normalizedRelativePath);
-    return new File([fileBuffer], fileName, { type: 'audio/spc' });
+    const relativePathsInDirectory = await collectRelativeFiles(absoluteDirectory);
+    return relativePathsInDirectory
+      .map((relativePath) => toPosixPath(path.posix.join(normalizedDirectory, relativePath)))
+      .filter((relativePath) => relativePath !== normalizedExcludedPath);
   } catch (error) {
     process.stdout.write(
-      `WARN: track audio file missing for ${normalizedRelativePath}: ${String(error.message || error)}\n`
+      `WARN: game directory missing for ${normalizedDirectory}: ${String(error.message || error)}\n`
     );
-    return null;
+    return [];
   }
+}
+
+async function buildGameFiles(gameDirectory, excludedRelativePath) {
+  const relativePaths = await collectGameDirectoryFiles(gameDirectory, excludedRelativePath);
+  const files = [];
+
+  for (const relativePath of relativePaths) {
+    const file = await buildSampleFile(relativePath, { fileName: path.basename(relativePath) });
+    if (file) {
+      files.push(file);
+    }
+  }
+
+  return files;
 }
 
 function valuesDiffer(a, b) {
@@ -182,6 +264,7 @@ async function syncGames(pb, gameItems, existingGames) {
       year: normalizeString(game.year),
       platform: normalizeString(game.platform),
       company: normalizeCompany(game.company),
+      directory: normalizeString(game.directory),
       coverArt: normalizeString(game.coverArt),
     };
 
@@ -213,7 +296,13 @@ async function syncGames(pb, gameItems, existingGames) {
           createBody.coverArt = createCoverFile;
         }
 
+        const createFiles = await buildGameFiles(normalizedGame.directory, normalizedGame.coverArt);
+        if (createFiles.length > 0) {
+          createBody.files = createFiles;
+        }
+
         if (dryRun) {
+          createdGames.set(normalizedGame.sourceId, normalizedGame.sourceId);
           process.stdout.write(`[dry-run] create game ${normalizedGame.platform} / ${normalizedGame.title}\n`);
           stats.created += 1;
         } else {
@@ -250,11 +339,29 @@ async function syncGames(pb, gameItems, existingGames) {
         ? path.basename(normalizedGame.coverArt)
         : '';
 
-      if (expectedCoverFileName && expectedCoverFileName !== existingCoverFileName) {
+      if (
+        expectedCoverFileName &&
+        toComparableFileName(expectedCoverFileName) !== toComparableFileName(existingCoverFileName)
+      ) {
         const patchCoverFile = await buildCoverFile(normalizedGame.coverArt);
         if (patchCoverFile) {
           patchBody.coverArt = patchCoverFile;
         }
+      }
+
+      const expectedGameFilePaths = await collectGameDirectoryFiles(
+        normalizedGame.directory,
+        normalizedGame.coverArt
+      );
+      const expectedGameFileNames = normalizeComparableFileNameList(
+        expectedGameFilePaths.map((relativePath) => path.basename(relativePath))
+      );
+      const existingGameFileNames = normalizeComparableFileNameList(
+        getFileFieldValues(existing, 'files')
+      );
+
+      if (valuesDiffer(existingGameFileNames, expectedGameFileNames)) {
+        patchBody.files = await buildGameFiles(normalizedGame.directory, normalizedGame.coverArt);
       }
 
       if (Object.keys(patchBody).length === 0) {
@@ -303,7 +410,7 @@ async function syncTracks(pb, indexItems, existingGames, createdGameIds) {
   let existingTracks = [];
   try {
     existingTracks = await pb.collection('tracks').getFullList({
-      fields: 'id,title,file,length,artist,metadata,gameId',
+      fields: 'id,title,filename,length,artist,metadata,gameId',
     });
   } catch (error) {
     process.stdout.write(`Note: could not fetch existing tracks (collection may be empty): ${error.message}\n`);
@@ -313,7 +420,7 @@ async function syncTracks(pb, indexItems, existingGames, createdGameIds) {
     if (typeof track.id === 'string' && track.id.length > 0) {
       existingById.set(track.id, track);
     }
-    const key = `${normalizeString(track.file).toLowerCase()}`;
+    const key = `${normalizeString(track.filename).toLowerCase()}`;
     if (existingByKey.has(key)) {
       process.stdout.write(`WARN: duplicate existing track key ${key}; using first record.\n`);
       continue;
@@ -325,21 +432,21 @@ async function syncTracks(pb, indexItems, existingGames, createdGameIds) {
     const normalizedTrack = {
       sourceId: normalizeString(track.id),
       title: normalizeString(track.title),
-      file: normalizeString(track.file),
+      filename: normalizeString(track.filename),
       length: typeof track.length === 'number' ? track.length : -1,
       artist: Array.isArray(track.artist) ? track.artist.map(normalizeString).filter(a => a.length > 0) : [],
       metadata: track.metadata && typeof track.metadata === 'object' ? track.metadata : {},
       gameIdSource: normalizeString(track.gameId),
     };
 
-    if (!normalizedTrack.title || !normalizedTrack.file) {
+    if (!normalizedTrack.title || !normalizedTrack.filename) {
       process.stdout.write(
-        `SKIP: track missing required fields (title=${normalizedTrack.title}, file=${normalizedTrack.file})\n`
+        `SKIP: track missing required fields (title=${normalizedTrack.title}, filename=${normalizedTrack.filename})\n`
       );
       continue;
     }
 
-    const fileKey = normalizedTrack.file.toLowerCase();
+    const fileKey = normalizedTrack.filename.toLowerCase();
     const existing = (normalizedTrack.sourceId ? existingById.get(normalizedTrack.sourceId) : null) ||
       existingByKey.get(fileKey);
 
@@ -362,19 +469,10 @@ async function syncTracks(pb, indexItems, existingGames, createdGameIds) {
           continue;
         }
 
-        const trackFile = await buildTrackFile(normalizedTrack.file);
-        if (!trackFile) {
-          stats.failed += 1;
-          process.stderr.write(
-            `ERROR: failed sync for track ${normalizedTrack.title}: could not read audio file ${normalizedTrack.file}\n`
-          );
-          continue;
-        }
-
         const createBody = {
           id: normalizedTrack.sourceId,
           title: normalizedTrack.title,
-          file: trackFile,
+          filename: normalizedTrack.filename,
           length: normalizedTrack.length,
           gameId: pbGameId,
         };
@@ -405,17 +503,8 @@ async function syncTracks(pb, indexItems, existingGames, createdGameIds) {
         patchBody.title = normalizedTrack.title;
       }
 
-      if (normalizeString(existing.file) !== normalizedTrack.file) {
-        const trackFile = await buildTrackFile(normalizedTrack.file);
-        if (trackFile) {
-          patchBody.file = trackFile;
-        } else {
-          stats.failed += 1;
-          process.stderr.write(
-            `ERROR: failed sync for track ${normalizedTrack.title}: could not read updated audio file ${normalizedTrack.file}\n`
-          );
-          continue;
-        }
+      if (normalizeString(existing.filename) !== normalizedTrack.filename) {
+        patchBody.filename = normalizedTrack.filename;
       }
 
       if ((existing.length ?? -1) !== normalizedTrack.length) {
@@ -468,6 +557,8 @@ async function syncTracks(pb, indexItems, existingGames, createdGameIds) {
 async function main() {
   const pb = new PocketBase(pbUrl);
 
+  process.stdout.write(`Using sample directory: ${sampleFilesDir} (arg: ${sampleFilesDirName})\n`);
+
   if (pbToken) {
     pb.authStore.save(pbToken, null);
     process.stdout.write('Authenticated with TRACKIFY_PB_TOKEN.\n');
@@ -478,10 +569,10 @@ async function main() {
   }
 
   const [indexItems, gameItems, existingGames] = await Promise.all([
-    readJsonArray(indexPath, 'sample-files/index.json'),
-    readJsonArray(gamesPath, 'sample-files/games.json'),
+    readJsonArray(indexPath, `${sampleFilesDirName}/index.json`),
+    readJsonArray(gamesPath, `${sampleFilesDirName}/games.json`),
     pb.collection('games').getFullList({
-      fields: 'id,title,year,platform,company,coverArt',
+      fields: 'id,title,year,platform,company,coverArt,files',
     }),
   ]);
 

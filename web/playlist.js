@@ -164,7 +164,6 @@ function publishSelected(index, autoplay) {
     renderTracks();
 
     const payload = {
-        playlistId: playlistInfo.playlistId,
         source: playlistInfo.source,
         selectedIndex: currentIndex,
         tracks,
@@ -192,7 +191,6 @@ function handleIndexLoaded(payload) {
     if (!payload) return;
 
     playlistInfo = {
-        playlistId: typeof payload.playlistId === 'string' ? payload.playlistId : 'sample-files-index',
         source: typeof payload.source === 'string' ? payload.source : 'sample-files/index.json',
     };
 

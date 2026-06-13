@@ -5,7 +5,7 @@
 # In JS-tooling mode (default), CMake writes backend/player runtime artifacts to
 # build/wasm and leaves final web dist assembly to npm/Vite.
 #
-# In legacy mode, CMake also stages web/ and sample-files/ directly into
+# In legacy mode, CMake also stages web/ directly into
 # build/dist for python-http-server style serving.
 #
 # Configure & build:
@@ -29,7 +29,6 @@ set(SUBMODULES "${CMAKE_SOURCE_DIR}/submodules")
 set(PATCHES "${CMAKE_SOURCE_DIR}/patches")
 set(WEBAUDIO_SRC "${SUBMODULES}/webaudio-player/src")
 set(CONCAT_SCRIPT "${CMAKE_SOURCE_DIR}/cmake/concat.cmake")
-set(SAMPLE_DIR "${CMAKE_SOURCE_DIR}/sample-files")
 set(WEB_DIR "${CMAKE_SOURCE_DIR}/web")
 
 option(TRACKIFY_JS_TOOLING
@@ -44,8 +43,6 @@ else()
     set(DIST_DIR "${WEB_DIST_DIR}")
     message(STATUS "TRACKIFY_JS_TOOLING=OFF: CMake will also stage web assets into ${DIST_DIR}")
 endif()
-
-set(SAMPLE_DIST_DIR "${DIST_DIR}/sample-files")
 
 file(MAKE_DIRECTORY "${DIST_DIR}")
 
@@ -89,7 +86,7 @@ add_subdirectory(backends/nez)
 add_subdirectory(backends/n64)
 add_subdirectory(backends/vgm)
 
-# ---- Stage static UI + sample files into dist/ ------------------------------
+# ---- Stage static UI files into dist/ ------------------------------
 set(_ui_files index.html app.js app.css)
 set(_staged_ui "")
 foreach(_f IN LISTS _ui_files)
@@ -101,25 +98,3 @@ foreach(_f IN LISTS _ui_files)
         COMMENT "Staging web/${_f}")
     list(APPEND _staged_ui "${DIST_DIR}/${_f}")
 endforeach()
-
-# Stage sample-files/ as a full directory so the web app can consume a
-# manifest and resolve all sample assets from one stable base path.
-file(GLOB _sample_inputs CONFIGURE_DEPENDS "${SAMPLE_DIR}/*")
-set(_legacy_sample_outputs "")
-foreach(_sample_in IN LISTS _sample_inputs)
-    get_filename_component(_sample_name "${_sample_in}" NAME)
-    list(APPEND _legacy_sample_outputs "${DIST_DIR}/${_sample_name}")
-endforeach()
-set(_sample_stamp "${DIST_DIR}/.sample-files.stamp")
-add_custom_command(
-    OUTPUT "${_sample_stamp}"
-    COMMAND "${CMAKE_COMMAND}" -E rm -f ${_legacy_sample_outputs}
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${SAMPLE_DIST_DIR}"
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${SAMPLE_DIR}" "${SAMPLE_DIST_DIR}"
-    COMMAND "${CMAKE_COMMAND}" -E touch "${_sample_stamp}"
-    DEPENDS ${_sample_inputs}
-    COMMENT "Staging sample-files/ directory")
-
-if(NOT TRACKIFY_JS_TOOLING)
-    add_custom_target(stage ALL DEPENDS ${_staged_ui} "${_sample_stamp}")
-endif()

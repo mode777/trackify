@@ -1,6 +1,6 @@
-# Plan: Web Audio Player for VGM sample files
+# Plan: Web Audio Player for VGM reference files
 
-Build a clean, single-page web audio player that plays the files in [sample-files](sample-files) by reusing the generic `webaudio-player` plus the `webpsx` (PSX/PSF) and `websnes` (SNES/SPC) cores. The two emscripten backends are compiled with **CMake via `emcmake`** (new `CMakeLists.txt` replicating the existing `makeEmscripten.bat` flags/exports), and a minimal hand-written UI auto-selects the backend by file extension.
+Build a clean, single-page web audio player that reuses the generic `webaudio-player` plus the `webpsx` (PSX/PSF) and `websnes` (SNES/SPC) cores. The two emscripten backends are compiled with **CMake via `emcmake`** (new `CMakeLists.txt` replicating the existing `makeEmscripten.bat` flags/exports), and a minimal hand-written UI auto-selects the backend by file extension. The [sample-files](sample-files) folder is local reference data, not a staged static web asset.
 
 ## Phase 1 — Toolchain setup
 1. Install + activate emsdk (one-time): `emsdk install latest` then `emsdk activate latest` in [submodules/emsdk](submodules/emsdk). Build commands run from the `emsdk_env` shell.
@@ -16,7 +16,7 @@ Build a clean, single-page web audio player that plays the files in [sample-file
 7. `web/index.html` + `web/app.js` + `web/app.css` — minimal UI (track list of the 2 sample files, play/pause/next, song-info display). `app.js` instantiates `PSXBackendAdapter` or `SNESBackendAdapter` based on extension and drives `ScriptNodePlayer.initialize(...)`. Includes a tiny compat shim `Module.Pointer_stringify = UTF8ToString` (modern emscripten removed it; `snes_adapter.js` still calls it).
 
 ## Phase 4 — Stage & run
-8. CMake stages `dist/`: the two `backend_*.js` + `.wasm`, `scriptprocessor_player.js`, UI files, and `sample-files/*` (incl. `driver.psflib` next to the minipsf so the file mapper resolves the dependency).
+8. CMake stages runtime/UI outputs in `dist/` (the two `backend_*.js` + `.wasm`, `scriptprocessor_player.js`, and UI files). Sample corpus files remain local reference data.
 9. Serve `dist/` over local HTTP (`emrun` or `python -m http.server`).
 
 ## Relevant files

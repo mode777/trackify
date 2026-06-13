@@ -5,7 +5,22 @@ import { inflateRawSync } from 'node:zlib';
 const REPO_API_LATEST =
   'https://api.github.com/repos/pocketbase/pocketbase/releases/latest';
 
-function resolveTarget() {
+function parseArguments() {
+  const args = process.argv.slice(2);
+  const result = { platform: null, arch: null };
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--platform' && i + 1 < args.length) {
+      result.platform = args[++i];
+    } else if (args[i] === '--arch' && i + 1 < args.length) {
+      result.arch = args[++i];
+    }
+  }
+
+  return result;
+}
+
+function resolveTarget(overridePlatform = null, overrideArch = null) {
   const platformMap = {
     win32: 'windows',
     linux: 'linux',
@@ -17,15 +32,34 @@ function resolveTarget() {
     arm64: 'arm64',
   };
 
-  const platform = platformMap[process.platform];
-  const arch = archMap[process.arch];
+  let platform, arch;
 
-  if (!platform) {
-    throw new Error(`Unsupported platform: ${process.platform}`);
+  if (overridePlatform) {
+    if (!['windows', 'linux', 'darwin'].includes(overridePlatform)) {
+      throw new Error(
+        `Invalid platform: ${overridePlatform}. Must be one of: windows, linux, darwin`
+      );
+    }
+    platform = overridePlatform;
+  } else {
+    platform = platformMap[process.platform];
+    if (!platform) {
+      throw new Error(`Unsupported platform: ${process.platform}`);
+    }
   }
 
-  if (!arch) {
-    throw new Error(`Unsupported architecture: ${process.arch}`);
+  if (overrideArch) {
+    if (!['amd64', 'arm64'].includes(overrideArch)) {
+      throw new Error(
+        `Invalid architecture: ${overrideArch}. Must be one of: amd64, arm64`
+      );
+    }
+    arch = overrideArch;
+  } else {
+    arch = archMap[process.arch];
+    if (!arch) {
+      throw new Error(`Unsupported architecture: ${process.arch}`);
+    }
   }
 
   return { platform, arch };
@@ -158,7 +192,8 @@ async function downloadAsset(url) {
 }
 
 async function main() {
-  const { platform, arch } = resolveTarget();
+  const args = parseArguments();
+  const { platform, arch } = resolveTarget(args.platform, args.arch);
   const release = await fetchLatestRelease();
   const asset = findAsset(release, platform, arch);
 

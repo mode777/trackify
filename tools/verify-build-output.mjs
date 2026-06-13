@@ -5,7 +5,6 @@ const distDir = path.join(process.cwd(), 'build', 'dist');
 
 const required = [
   'index.html',
-  'sample-files/index.json',
   'wasm/scriptprocessor_player.js',
   'wasm/backend_psx.js',
   'wasm/backend_snes.js',

@@ -8,7 +8,12 @@ const require = createRequire(import.meta.url);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const scriptRootDir = path.resolve(scriptDir, '..');
 const cwdRootDir = process.cwd();
-const sampleDir = path.join(cwdRootDir, 'sample-files');
+const DEFAULT_SAMPLE_DIR = 'sample-files';
+const sampleDirArg = process.argv[2];
+const sampleDirName = sampleDirArg && sampleDirArg.trim() ? sampleDirArg.trim() : DEFAULT_SAMPLE_DIR;
+const sampleDir = path.resolve(cwdRootDir, sampleDirName);
+const sampleVirtualPrefix = normalizeRequestName(sampleDirName).replace(/^\/+|\/+$/g, '') || DEFAULT_SAMPLE_DIR;
+const sampleVirtualRoot = `/${sampleVirtualPrefix}`;
 const indexPath = path.join(sampleDir, 'index.json');
 const gamesPath = path.join(sampleDir, 'games.json');
 const wasmDir = path.join(scriptRootDir, 'build', 'wasm');
@@ -208,9 +213,17 @@ function resolveSampleDependency(requestedName) {
 	if (!normalized) return null;
 
 	const currentDir = path.posix.dirname(runtimeState.currentTrackRel || '');
-	const withoutSamplePrefix = normalized.startsWith('sample-files/')
-		? normalized.slice('sample-files/'.length)
-		: normalized;
+	let withoutSamplePrefix = normalized;
+	const removablePrefixes = [
+		`${sampleVirtualPrefix}/`,
+		`${DEFAULT_SAMPLE_DIR}/`,
+	];
+	for (const prefix of removablePrefixes) {
+		if (withoutSamplePrefix.startsWith(prefix)) {
+			withoutSamplePrefix = withoutSamplePrefix.slice(prefix.length);
+			break;
+		}
+	}
 
 	const candidates = [normalized, withoutSamplePrefix];
 
@@ -244,7 +257,7 @@ function ensureVirtualDirectory(module, virtualDir) {
 
 function ensureFileInVirtualFs(module, sampleRelPath, data) {
 	const normalizedRel = normalizeRequestName(sampleRelPath);
-	const virtualPath = `/sample-files/${normalizedRel}`;
+	const virtualPath = `${sampleVirtualRoot}/${normalizedRel}`;
 	const virtualDir = path.posix.dirname(virtualPath);
 	const virtualName = path.posix.basename(virtualPath);
 
@@ -618,6 +631,7 @@ function buildGamesIndex(indexItems, coverArtByDirectory) {
 		const fallbackYear = extractYearFromText(copyright);
 		const year = metadataYear || fallbackYear;
 		const company = extractCompaniesFromCopyright(copyright);
+		const directory = path.posix.dirname(String(item.file || ''));
 		const folderImages = coverArtByDirectory.get(pathParts.gameDir) || [];
 		const coverArt = folderImages[0] || '';
 
@@ -628,6 +642,7 @@ function buildGamesIndex(indexItems, coverArtByDirectory) {
 				platform,
 				year,
 				company,
+				directory,
 				coverArt,
 			});
 			continue;
@@ -642,6 +657,9 @@ function buildGamesIndex(indexItems, coverArtByDirectory) {
 		}
 		if (company.length) {
 			existing.company = [...new Set([...existing.company, ...company])];
+		}
+		if (!existing.directory && directory) {
+			existing.directory = directory;
 		}
 		if (!existing.coverArt && coverArt) {
 			existing.coverArt = coverArt;
@@ -687,7 +705,7 @@ async function extractTrackMetadata(fileRelPath) {
 
 	if (platform === 'vgm') {
 		try {
-			module.ccall('emu_set_resource_path', null, ['string'], ['/sample-files/']);
+			module.ccall('emu_set_resource_path', null, ['string'], [`${sampleVirtualRoot}/`]);
 		} catch {
 			// Older builds may not expose resource-path support.
 		}
@@ -736,10 +754,10 @@ async function extractTrackMetadata(fileRelPath) {
 }
 
 async function main() {
-	logInfo(`Starting sample index generation from ${sampleDir}`);
+	logInfo(`Starting sample index generation from ${sampleDir} (arg: ${sampleDirName})`);
 
 	const relativeFiles = await collectRelativeFiles(sampleDir);
-	logInfo(`Discovered ${relativeFiles.length} files under sample-files.`);
+	logInfo(`Discovered ${relativeFiles.length} files under ${sampleDirName}.`);
 	logInfo('Loading sample files into memory...');
 
 	let loadedFileCount = 0;
@@ -795,11 +813,18 @@ async function main() {
 	resolveUnknownGameNames(indexItems);
 
 	indexItems.sort((a, b) => a.file.localeCompare(b.file));
+	const outputIndexItems = indexItems.map((item) => {
+		const { file, ...rest } = item;
+		return {
+			...rest,
+			filename: path.posix.basename(String(file || '')),
+		};
+	});
 	const gamesItems = buildGamesIndex(indexItems, coverArtByDirectory);
 	logInfo(`Built games index with ${gamesItems.length} unique game entries.`);
 
 	logInfo('Writing output files...');
-	await fs.writeFile(indexPath, `${JSON.stringify(indexItems, null, 2)}\n`, 'utf8');
+	await fs.writeFile(indexPath, `${JSON.stringify(outputIndexItems, null, 2)}\n`, 'utf8');
 	await fs.writeFile(gamesPath, `${JSON.stringify(gamesItems, null, 2)}\n`, 'utf8');
 
 	process.stdout.write(

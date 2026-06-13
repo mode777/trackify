@@ -5,8 +5,6 @@ const root = process.cwd();
 const wasmDir = path.join(root, 'build', 'wasm');
 const publicDir = path.join(root, 'build', 'web-public');
 const publicWasmDir = path.join(publicDir, 'wasm');
-const sourceSamplesDir = path.join(root, 'sample-files');
-const publicSamplesDir = path.join(publicDir, 'sample-files');
 const xaBackendSourceFile = path.join(root, 'web', 'backend_xa.js');
 
 const requiredRuntimeFiles = [
@@ -61,15 +59,10 @@ async function copyRuntimeArtifacts() {
   );
 }
 
-async function copySampleFiles() {
-  await fs.cp(sourceSamplesDir, publicSamplesDir, { recursive: true });
-}
-
 async function main() {
   await ensureRuntimeArtifacts();
   await cleanPublicDir();
   await copyRuntimeArtifacts();
-  await copySampleFiles();
 
   process.stdout.write(
     `Prepared runtime assets in ${publicDir}\\n`

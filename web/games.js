@@ -114,7 +114,6 @@ async function playGame(gameTitle) {
         const selectedIndex = Math.max(0, Math.min(tracks.length - 1, preferredIndex));
 
         broker.publish('playlist.selected', {
-            playlistId: typeof payload.playlistId === 'string' ? payload.playlistId : 'sample-files-index',
             source: typeof payload.source === 'string' ? payload.source : 'sample-files/index.json',
             selectedIndex,
             tracks,
@@ -182,13 +181,13 @@ function renderGames() {
         els.grid.appendChild(item);
 
         card.addEventListener('click', () => {
-            openPlaylist(game.title);
+            openPlaylist(game.id);
         });
 
         card.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
-            openPlaylist(game.title);
+            openPlaylist(game.id);
         });
 
         playButton.addEventListener('click', (event) => {
@@ -218,6 +217,7 @@ function handleGamesPayload(payload) {
     games = payload.games
         .filter((entry) => entry && typeof entry.title === 'string')
         .map((entry) => ({
+            ...entry,
             title: entry.title.trim(),
             company: Array.isArray(entry.company) ? entry.company : [],
             year: typeof entry.year === 'string' ? entry.year : '',

@@ -21,9 +21,7 @@ the active backend reports valid playback-position support.
 
 Backend scripts are lazy-loaded on first use, so only the selected format runtime is fetched and initialized.
 
-Track metadata is loaded at runtime from `sample-files/index.json` (array of
-`{ title, file }` objects), and audio files are fetched from the same
-`sample-files/` directory.
+Track metadata is loaded at runtime from pocketbase backend.
 
 ---
 
@@ -134,13 +132,11 @@ build/
 │   ├── n64.wasm
 │   └── vgm.wasm
 ├── web-public/
-│   ├── wasm/
-│   └── sample-files/
+│   └── wasm/
 └── dist/
     ├── index.html
     ├── assets/...
-    ├── wasm/...
-    └── sample-files/...
+  └── wasm/...
 ```
 
 ### 5. Dev server
@@ -212,7 +208,7 @@ Lookup behavior:
 
 ### Legacy CMake-only mode (optional)
 
-If you want the old staging behavior (CMake copies `web/` + `sample-files/`
+If you want the old staging behavior (CMake copies `web/`
 directly into `build/dist`), configure with:
 
 ```bash
@@ -501,7 +497,7 @@ backends/
   vgm/CMakeLists.txt        # VGM backend build
 web/
   index.html • app.js • app.css
-sample-files/               # demo tracks
+sample-files/               # reference track corpus (not staged as web assets)
 submodules/
   webaudio-player/          # generic engine (untouched)
   webpsx/                   # PSX core (untouched)
