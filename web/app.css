@@ -244,6 +244,89 @@ body {
     place-items: center;
 }
 
+.avatar-btn {
+    border: 0;
+    cursor: pointer;
+}
+
+.auth-menu {
+    position: relative;
+}
+
+.auth-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 220px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel-low) 94%, black);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+    z-index: 40;
+}
+
+.auth-identity {
+    padding: 2px 2px 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 8px;
+}
+
+.auth-user-name {
+    font-family: Geist, sans-serif;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    word-break: break-word;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.auth-logout-btn {
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    color: var(--text);
+    font-family: Geist, sans-serif;
+    text-align: left;
+    cursor: pointer;
+}
+
+.auth-logout-btn:hover,
+.auth-logout-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.login-btn {
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #d2bbff, #7c3aed);
+    color: #18043f;
+    font-family: Geist, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: filter 160ms ease;
+}
+
+.login-btn:hover,
+.login-btn:focus-visible {
+    filter: brightness(1.07);
+}
+
+.login-btn[hidden],
+.auth-menu[hidden],
+.auth-dropdown[hidden] {
+    display: none;
+}
+
+[data-auth-required][hidden] {
+    display: none !important;
+}
+
 .player-host {
     padding: 0;
     border-top: 1px solid var(--line);

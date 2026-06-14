@@ -383,6 +383,13 @@ class TrackifyBroker {
 
     postRawMessage(message, targetWindow) {
         if (this.mode === 'shell') {
+            if (message.type === TYPE_EVENT && message.target === '*') {
+                this.logOutgoingMessage(message, null, '*');
+                this.dispatchLocalEvent(message);
+                this.forwardEventToSubscribers(message);
+                return;
+            }
+
             const resolvedTargetWindow = targetWindow || this.resolveTargetWindow(message.target);
             if (!resolvedTargetWindow) {
                 throw new Error('Cannot resolve target window for message topic: ' + message.topic);

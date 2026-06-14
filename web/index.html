@@ -23,10 +23,10 @@
             <a class="active" href="/games.html" target="content-frame"><span class="material-symbols-outlined">sports_esports</span>Games</a>
             <a href="#"><span class="material-symbols-outlined">layers</span>Platforms</a>
             <a href="#"><span class="material-symbols-outlined">person</span>Artists</a>
-            <a href="#"><span class="material-symbols-outlined">library_music</span>Your Library</a>
+            <a href="#" data-auth-required hidden><span class="material-symbols-outlined">library_music</span>Your Library</a>
         </nav>
 
-        <button class="create-btn" type="button">
+        <button class="create-btn" type="button" data-auth-required hidden>
             <span class="material-symbols-outlined">add</span>
             Create Playlist
         </button>
@@ -40,9 +40,13 @@
     <div class="main-shell">
         <header class="top-bar">
             <div class="top-left">
-                <div class="history-buttons" aria-hidden="true">
-                    <button type="button"><span class="material-symbols-outlined">chevron_left</span></button>
-                    <button type="button" disabled><span class="material-symbols-outlined">chevron_right</span></button>
+                <div class="history-buttons">
+                    <button type="button" data-history-action="back" aria-label="Go back">
+                        <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    <button type="button" data-history-action="forward" aria-label="Go forward">
+                        <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
                 </div>
                 <label class="search-wrap" aria-label="Search for tracks">
                     <span class="material-symbols-outlined">search</span>
@@ -51,7 +55,16 @@
             </div>
             <div class="top-right">
                 <button class="ghost-icon" type="button"><span class="material-symbols-outlined">notifications</span></button>
-                <div class="avatar" aria-hidden="true">T</div>
+                <button class="login-btn" type="button">Login with Google</button>
+                <div class="auth-menu" hidden>
+                    <button class="avatar avatar-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="User menu">T</button>
+                    <div class="auth-dropdown" role="menu" hidden>
+                        <div class="auth-identity" role="presentation">
+                            <div class="auth-user-name"></div>
+                        </div>
+                        <button class="auth-logout-btn" type="button" role="menuitem">Log out</button>
+                    </div>
+                </div>
             </div>
         </header>
 

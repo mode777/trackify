@@ -233,7 +233,6 @@ export class ShellCatalogService {
         }
 
         const url = window.location.protocol + '//' + window.location.host + '/api/files/games/' + encodeURIComponent(record.gameId) + '/' + encodeURIComponent(value);
-        console.log('resolveFilename: ' + url);
         return url;
     }
 }
