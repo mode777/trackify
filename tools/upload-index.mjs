@@ -82,29 +82,6 @@ function getFileFieldValues(existingRecord, fieldName) {
   return [];
 }
 
-function stripPocketBaseFileSuffix(fileName) {
-  const normalized = path.basename(normalizeString(fileName));
-  if (!normalized) {
-    return '';
-  }
-
-  const extension = path.extname(normalized);
-  const stem = extension ? normalized.slice(0, -extension.length) : normalized;
-  const strippedStem = stem.replace(/_[a-z0-9]{10}$/i, '');
-  return `${strippedStem}${extension}`;
-}
-
-function toComparableFileName(fileName) {
-  return stripPocketBaseFileSuffix(fileName).toLowerCase();
-}
-
-function normalizeComparableFileNameList(fileNames) {
-  return fileNames
-    .map((fileName) => toComparableFileName(fileName))
-    .filter((fileName) => fileName.length > 0)
-    .sort((a, b) => a.localeCompare(b));
-}
-
 async function buildSampleFile(relativePath, options = {}) {
   if (!relativePath) {
     return null;
@@ -138,17 +115,24 @@ async function buildCoverFile(relativePath) {
 
 async function collectRelativeFiles(baseDir) {
   const out = [];
+  const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg|ico|tiff)$/i;
 
   async function walk(currentDir) {
     const entries = await fs.readdir(currentDir, { withFileTypes: true });
     entries.sort((a, b) => a.name.localeCompare(b.name));
 
     for (const entry of entries) {
+      if (entry.name.startsWith('.')) {
+        continue;
+      }
+
       const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
       } else if (entry.isFile()) {
-        out.push(toPosixPath(path.relative(baseDir, fullPath)));
+        if (!imageExtensions.test(entry.name)) {
+          out.push(toPosixPath(path.relative(baseDir, fullPath)));
+        }
       }
     }
   }
@@ -194,7 +178,58 @@ async function buildGameFiles(gameDirectory, excludedRelativePath) {
 }
 
 function valuesDiffer(a, b) {
-  return JSON.stringify(a) !== JSON.stringify(b);
+  return stableStringify(a) !== stableStringify(b);
+}
+
+function stableStringify(value) {
+  return JSON.stringify(sortObjectKeysDeep(value));
+}
+
+function sortObjectKeysDeep(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortObjectKeysDeep(entry));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const sortedEntries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+  const out = {};
+
+  for (const [key, entryValue] of sortedEntries) {
+    out[key] = sortObjectKeysDeep(entryValue);
+  }
+
+  return out;
+}
+
+function formatValueForLog(value) {
+  if (value == null) {
+    return 'null';
+  }
+
+  if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[unserializable]';
+  }
+}
+
+function formatChangeDetails(changes) {
+  return changes
+    .map(({ field, oldValue, newValue }) => {
+      return `${field}:${formatValueForLog(oldValue)}->${formatValueForLog(newValue)}`;
+    })
+    .join(' | ');
 }
 
 function formatPocketBaseError(error) {
@@ -316,22 +351,30 @@ async function syncGames(pb, gameItems, existingGames) {
       }
 
       const patchBody = {};
+      const patchChanges = [];
 
-      if (normalizeString(existing.title) !== normalizedGame.title) {
+      const existingTitle = normalizeString(existing.title);
+      if (existingTitle !== normalizedGame.title) {
         patchBody.title = normalizedGame.title;
+        patchChanges.push({ field: 'title', oldValue: existingTitle, newValue: normalizedGame.title });
       }
 
-      if (normalizeString(existing.year) !== normalizedGame.year) {
+      const existingYear = normalizeString(existing.year);
+      if (existingYear !== normalizedGame.year && normalizedGame.year.length > 0) {
         patchBody.year = normalizedGame.year;
+        patchChanges.push({ field: 'year', oldValue: existingYear, newValue: normalizedGame.year });
       }
 
-      if (normalizeString(existing.platform) !== normalizedGame.platform) {
+      const existingPlatform = normalizeString(existing.platform);
+      if (existingPlatform !== normalizedGame.platform) {
         patchBody.platform = normalizedGame.platform;
+        patchChanges.push({ field: 'platform', oldValue: existingPlatform, newValue: normalizedGame.platform });
       }
 
       const existingCompany = normalizeCompany(existing.company);
-      if (valuesDiffer(existingCompany, normalizedGame.company)) {
+      if (normalizedGame.company.length > 0 && valuesDiffer(existingCompany, normalizedGame.company)) {
         patchBody.company = normalizedGame.company;
+        patchChanges.push({ field: 'company', oldValue: existingCompany, newValue: normalizedGame.company });
       }
 
       const existingCoverFileName = getCoverFilename(existing);
@@ -339,13 +382,15 @@ async function syncGames(pb, gameItems, existingGames) {
         ? path.basename(normalizedGame.coverArt)
         : '';
 
-      if (
-        expectedCoverFileName &&
-        toComparableFileName(expectedCoverFileName) !== toComparableFileName(existingCoverFileName)
-      ) {
+      if (expectedCoverFileName && expectedCoverFileName !== existingCoverFileName) {
         const patchCoverFile = await buildCoverFile(normalizedGame.coverArt);
         if (patchCoverFile) {
           patchBody.coverArt = patchCoverFile;
+          patchChanges.push({
+            field: 'coverArt',
+            oldValue: existingCoverFileName,
+            newValue: expectedCoverFileName,
+          });
         }
       }
 
@@ -353,15 +398,21 @@ async function syncGames(pb, gameItems, existingGames) {
         normalizedGame.directory,
         normalizedGame.coverArt
       );
-      const expectedGameFileNames = normalizeComparableFileNameList(
-        expectedGameFilePaths.map((relativePath) => path.basename(relativePath))
-      );
-      const existingGameFileNames = normalizeComparableFileNameList(
-        getFileFieldValues(existing, 'files')
-      );
+      const expectedGameFileNames = expectedGameFilePaths
+        .map((relativePath) => path.basename(relativePath))
+        .filter((fileName) => fileName.length > 0)
+        .sort((a, b) => a.localeCompare(b));
+      const existingGameFileNames = getFileFieldValues(existing, 'files')
+        .filter((fileName) => fileName.length > 0)
+        .sort((a, b) => a.localeCompare(b));
 
       if (valuesDiffer(existingGameFileNames, expectedGameFileNames)) {
         patchBody.files = await buildGameFiles(normalizedGame.directory, normalizedGame.coverArt);
+        patchChanges.push({
+          field: 'files',
+          oldValue: existingGameFileNames,
+          newValue: expectedGameFileNames,
+        });
       }
 
       if (Object.keys(patchBody).length === 0) {
@@ -369,16 +420,19 @@ async function syncGames(pb, gameItems, existingGames) {
         continue;
       }
 
+      const changedFields = Object.keys(patchBody).join(',');
+      const changeDetails = formatChangeDetails(patchChanges);
+
       if (dryRun) {
         process.stdout.write(
-          `[dry-run] patch game ${normalizedGame.platform} / ${normalizedGame.title} fields=${Object.keys(patchBody).join(',')}\n`
+          `[dry-run] patch game ${normalizedGame.platform} / ${normalizedGame.title} fields=${changedFields} changes=${changeDetails}\n`
         );
         stats.updated += 1;
       } else {
         await pb.collection('games').update(existing.id, patchBody);
         stats.updated += 1;
         process.stdout.write(
-          `Patched game ${normalizedGame.platform} / ${normalizedGame.title} fields=${Object.keys(patchBody).join(',')}\n`
+          `Patched game ${normalizedGame.platform} / ${normalizedGame.title} fields=${changedFields} changes=${changeDetails}\n`
         );
       }
     } catch (error) {
