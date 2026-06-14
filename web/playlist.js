@@ -18,6 +18,7 @@ const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
 const EXT_N64 = ['usf', 'miniusf', 'usflib'];
 const EXT_VGM = ['vgm', 'vgz', 'cmf', 'dro'];
 const EXT_XA = ['xa'];
+const EXT_GENH = ['genh'];
 
 const els = {
     heroArt: document.querySelector('.hero-art'),
@@ -104,6 +105,7 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
+    if (EXT_GENH.includes(ext)) return 'genh';
     if (EXT_XA.includes(ext)) return 'xa';
     if (EXT_VGM.includes(ext)) return 'vgm';
     if (EXT_N64.includes(ext)) return 'n64';

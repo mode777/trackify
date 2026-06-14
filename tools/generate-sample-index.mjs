@@ -37,6 +37,7 @@ const EXT_PLATFORM = {
 	cmf: 'vgm',
 	dro: 'vgm',
 	xa: 'xa',
+	genh: 'genh',
 };
 
 const COVER_ART_EXTENSIONS = new Set(['png', 'jpg', 'gif', 'webp']);
@@ -673,8 +674,9 @@ async function extractTrackMetadata(fileRelPath) {
 	const platform = getPlatform(fileRelPath);
 	if (!platform) return null;
 
-	if (platform === 'xa') {
+	if (platform === 'xa' || platform === 'genh') {
 		const title = stripExtension(fileRelPath);
+		const detail = platform === 'genh' ? 'GENH Audio' : 'XA ADPCM';
 		return buildEntry(
 			fileRelPath,
 			{
@@ -686,7 +688,7 @@ async function extractTrackMetadata(fileRelPath) {
 					title,
 					artist: '',
 					game: '',
-					detail: 'XA ADPCM',
+					detail,
 				},
 			}
 		);
