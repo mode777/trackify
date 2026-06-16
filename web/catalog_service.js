@@ -4,6 +4,9 @@ import PocketBase from 'pocketbase';
 
 const TRACKS_COLLECTION = 'tracks_view';
 const GAMES_COLLECTION = 'games';
+const PLAYLISTS_COLLECTION = 'playlists';
+const PLAYLIST_TRACKS_VIEW_COLLECTION = 'playlist_tracks_view';
+const FAVORITES_COLLECTION = 'favorites';
 
 const EXTENSIONS = {
     psx: ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'],
@@ -30,10 +33,30 @@ export class ShellCatalogService {
         this.gamesLoadErrorMessage = 'Error loading games collection (see console)';
     }
 
+    async queryFavorites() {
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+        const response = await this.pb.collection(PLAYLIST_TRACKS_VIEW_COLLECTION).getList(1, 1000, { filter: `userId="${this.pb.authStore.record.id}" && type="favorites"` });
+        return this.parseTracksManifest(response.items);
+    }
+
+    async addFavorite(trackId) {
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+        const record = await this.pb.collection(FAVORITES_COLLECTION).create({ track: trackId, user: this.pb.authStore.record.id });
+        return record;
+    }
+
     async queryIndex(filters) {
-        await this.ensureIndexLoaded();
-        const filteredTracks = this.filterTracks(this.indexTracks, filters || {});
-        return this.makeIndexPayload(filteredTracks, this.indexLoadError);
+        let tracks = [];
+        if (filters.game){
+            tracks = await this.loadTracksForGame(filters.game);
+        } else {
+            tracks = await this.loadTracks();
+        }
+        return this.makeIndexPayload(tracks, this.indexLoadError);
     }
 
     async queryGames(filters) {
@@ -43,27 +66,7 @@ export class ShellCatalogService {
     }
 
     preload() {
-        this.ensureIndexLoaded();
         this.ensureGamesLoaded();
-    }
-
-    async ensureIndexLoaded() {
-        if (this.indexLoadPromise) {
-            return this.indexLoadPromise;
-        }
-
-        this.indexLoadPromise = this.loadTracks()
-            .then((tracks) => {
-                this.indexTracks = tracks;
-                this.indexLoadError = '';
-            })
-            .catch((error) => {
-                console.error('Failed to load tracks', error);
-                this.indexTracks = [];
-                this.indexLoadError = this.indexLoadErrorMessage;
-            });
-
-        return this.indexLoadPromise;
     }
 
     async ensureGamesLoaded() {
@@ -86,8 +89,13 @@ export class ShellCatalogService {
     }
 
     async loadTracks() {
-        const records = await this.pb.collection(TRACKS_COLLECTION).getFullList();
-        return this.parseTracksManifest(records);
+        const records = await this.pb.collection(TRACKS_COLLECTION).getList(1, 100, { sort: 'title' });
+        return this.parseTracksManifest(records.items);
+    }
+
+    async loadTracksForGame(gameId) {
+        const records = await this.pb.collection(TRACKS_COLLECTION).getList(1, 1000, { sort: 'title', filter: `gameId="${gameId}"` });
+        return this.parseTracksManifest(records.items);
     }
 
     async loadGames() {
@@ -108,6 +116,7 @@ export class ShellCatalogService {
                 artist: this.normalizeArtist(entry.artist),
                 file: this.resolveFilename(entry, 'filename'),
                 gameId: typeof entry.gameId === 'string' ? entry.gameId.trim() : '',
+                coverArt: this.resolveFileField(entry, 'coverArt'),
             }));
     }
 
@@ -127,24 +136,6 @@ export class ShellCatalogService {
                     : [],
                 coverArt: this.resolveFileField(entry, 'coverArt'),
             }));
-    }
-
-    filterTracks(tracks, filters) {
-        const gameFilter = this.normalizeFilterValue(filters && filters.game);
-        const platformFilter = this.normalizeFilterValue(filters && filters.platform);
-
-        if (!gameFilter && !platformFilter) {
-            return tracks;
-        }
-
-        return tracks.filter((track) => {
-            const gameValue = this.normalizeFilterValue(track.gameId);
-            const platformValue = this.normalizeFilterValue(track.platform || this.typeOf(track.file));
-
-            if (gameFilter && gameValue !== gameFilter) return false;
-            if (platformFilter && platformValue !== platformFilter) return false;
-            return true;
-        });
     }
 
     filterGames(entries, filters) {

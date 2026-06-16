@@ -2,7 +2,9 @@
 # Mirrors submodules/webpsx/emscripten/makeEmscripten.bat (modernized flags).
 
 set(PSX_ROOT "${SUBMODULES}/webpsx")
+set(PSX_PATCH "${PATCHES}/webpsx")
 set(PSX_EMS "${PSX_ROOT}/emscripten")
+set(PSX_EMS_PATCH "${PSX_PATCH}/emscripten")
 
 set(PSX_SOURCES
     # Core emulator
@@ -35,7 +37,7 @@ set(PSX_SOURCES
     "${PSX_ROOT}/zlib/inffast.c"
     # Glue / driver
     "${PSX_EMS}/SPUDriver.cpp"
-    "${PSX_EMS}/heplug.c"
+    "${PSX_EMS_PATCH}/heplug.c"
     "${PSX_EMS}/MetaInfoHelper.cpp"
     "${PSX_EMS}/Adapter.cpp")
 

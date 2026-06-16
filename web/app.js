@@ -439,6 +439,21 @@ function initBroker() {
         syncShellMediaSession(payload);
     });
 
+    shellBroker.subscribe('playlist.liked', async ({ payload }) => {
+        await catalogService.addFavorite(payload && payload.trackId);
+        console.log('playlist.liked', payload && payload.trackId);
+    });
+
+    shellBroker.subscribe('shell.user.login', async ({ payload }) => {
+        const favorites = await catalogService.queryFavorites();
+        shellBroker.publish('playlist.selected', {
+            source: 'favorites',
+            selectedIndex: favorites.length > 0 ? 0 : -1,
+            tracks: favorites,
+            autoplay: false,
+        }, { target: 'player' });
+    });
+
     shellBroker.start();
 }
 
@@ -449,6 +464,9 @@ function init() {
     bindShellMediaSessionHandlers();
     bindMediaKeyFallback();
     initBroker();
+    if(pb.authStore.isValid) {
+        publishAuthLifecycleEvent('shell.user.login');
+    }
 }
 
 if (document.readyState === 'loading') {

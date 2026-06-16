@@ -174,6 +174,10 @@ function renderTracks() {
         favoriteIcon.setAttribute('aria-hidden', 'true');
         favoriteIcon.textContent = 'favorite_border';
         favorite.append(favoriteIcon);
+        favorite.addEventListener('click', (event) => {
+            event.stopPropagation();
+            broker.publish('playlist.liked', { trackId: track.id }, { target: 'shell' });
+        });
 
         main.append(meta, favorite);
 
