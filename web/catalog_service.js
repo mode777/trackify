@@ -2,7 +2,7 @@
 
 import PocketBase from 'pocketbase';
 
-const TRACKS_COLLECTION = 'tracks';
+const TRACKS_COLLECTION = 'tracks_view';
 const GAMES_COLLECTION = 'games';
 
 const EXTENSIONS = {

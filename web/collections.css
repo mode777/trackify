@@ -1,4 +1,4 @@
-.games-page {
+.collections-page {
     margin: 0;
     min-height: 100vh;
     background: transparent;
@@ -6,13 +6,13 @@
     overflow-y: auto;
 }
 
-.games-root {
+.collections-root {
     width: min(1300px, calc(100vw - 32px));
     margin: 0 auto;
     padding: 24px 8px 48px;
 }
 
-.games-header {
+.collections-header {
     margin-bottom: 22px;
 }
 
@@ -25,7 +25,7 @@
     text-transform: uppercase;
 }
 
-.games-header h2 {
+.collections-header h2 {
     margin: 8px 0 0;
     font-family: Montserrat, sans-serif;
     font-size: clamp(1.7rem, 1.5rem + 1vw, 2.4rem);
@@ -34,7 +34,7 @@
     letter-spacing: -0.02em;
 }
 
-.games-subtitle {
+.collections-subtitle {
     margin: 10px 0 0;
     color: var(--muted);
     font-size: 0.98rem;
@@ -46,7 +46,7 @@
     font-size: 0.86rem;
 }
 
-.games-grid {
+.collections-grid {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -55,7 +55,7 @@
     gap: 20px;
 }
 
-.game-card {
+.collection-card {
     border: 1px solid var(--line);
     border-radius: 14px;
     background: linear-gradient(180deg, color-mix(in srgb, var(--panel-low) 82%, transparent), var(--panel-low));
@@ -63,13 +63,13 @@
     transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
-.game-card:hover {
+.collection-card:hover {
     transform: translateY(-4px);
     border-color: color-mix(in srgb, var(--accent-soft) 40%, var(--line));
     box-shadow: 0 10px 24px rgba(6, 10, 24, 0.42);
 }
 
-.game-link {
+.collection-link {
     background: transparent;
     color: inherit;
     text-align: left;
@@ -79,12 +79,12 @@
     display: block;
 }
 
-.game-link:focus-visible {
+.collection-link:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--accent-soft) 72%, white);
     outline-offset: -2px;
 }
 
-.game-cover {
+.collection-cover {
     position: relative;
     aspect-ratio: 4 / 3;
     background:
@@ -95,7 +95,7 @@
     overflow: hidden;
 }
 
-.game-cover.has-art::before {
+.collection-cover.has-art::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -105,14 +105,14 @@
     transform: scale(1.02);
 }
 
-.game-cover.has-art::after {
+.collection-cover.has-art::after {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.54));
 }
 
-.game-play-button {
+.collection-play-button {
     position: absolute;
     right: 10px;
     bottom: 10px;
@@ -134,20 +134,20 @@
     transition: color 160ms ease;
 }
 
-.game-play-button:hover {
+.collection-play-button:hover {
     color: var(--accent);
 }
 
-.game-play-button:focus-visible {
+.collection-play-button:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--accent) 75%, white);
     outline-offset: 2px;
 }
 
-.game-body {
+.collection-body {
     padding: 14px 14px 10px;
 }
 
-.game-title {
+.collection-title {
     margin: 0;
     font-family: Montserrat, sans-serif;
     font-size: 1.02rem;
@@ -156,7 +156,7 @@
     color: var(--text);
 }
 
-.game-meta {
+.collection-meta {
     margin-top: 6px;
     color: var(--muted);
     font-size: 0.86rem;
@@ -167,21 +167,21 @@
 }
 
 @media (max-width: 700px) {
-    .games-root {
+    .collections-root {
         width: min(100vw, 100%);
         padding: 16px 0 24px;
     }
 
-    .games-grid {
+    .collections-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
     }
 
-    .game-body {
+    .collection-body {
         padding: 10px 10px 8px;
     }
 
-    .game-title {
+    .collection-title {
         font-size: 0.96rem;
     }
 }

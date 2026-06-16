@@ -502,6 +502,22 @@ function buildEntry(fileRelPath, metadata) {
 	};
 }
 
+function buildFilenameEntry(fileRelPath, extraMetadata = {}) {
+	const title = stripExtension(fileRelPath);
+	return buildEntry(fileRelPath, {
+		title,
+		artist: '',
+		game: '',
+		length: -1,
+		metadata: {
+			title,
+			artist: '',
+			game: '',
+			...extraMetadata,
+		},
+	});
+}
+
 function extractYearFromText(value) {
 	if (typeof value !== 'string') return '';
 	const match = value.match(/\b(\d{4})\b/);
@@ -675,59 +691,50 @@ async function extractTrackMetadata(fileRelPath) {
 	if (!platform) return null;
 
 	if (platform === 'xa' || platform === 'genh') {
-		const title = stripExtension(fileRelPath);
 		const detail = platform === 'genh' ? 'GENH Audio' : 'XA ADPCM';
-		return buildEntry(
-			fileRelPath,
-			{
-				title,
-				artist: '',
-				game: '',
-				length: -1,
-				metadata: {
-					title,
-					artist: '',
-					game: '',
-					detail,
-				},
-			}
-		);
+		return buildFilenameEntry(fileRelPath, { detail });
 	}
 
-	const module = await loadBackend(platform);
-	const data = sampleFileDataByPath.get(fileRelPath.toLowerCase())?.data;
-
-	if (!data) {
-		throw new Error(`Missing file data for ${fileRelPath}`);
-	}
-
-	const virtualPath = ensureFileInVirtualFs(module, fileRelPath, data);
-	runtimeState.module = module;
-	runtimeState.currentTrackRel = fileRelPath;
-
-	if (platform === 'vgm') {
-		try {
-			module.ccall('emu_set_resource_path', null, ['string'], [`${sampleVirtualRoot}/`]);
-		} catch {
-			// Older builds may not expose resource-path support.
-		}
-	}
-
-	const inputPtr = module._malloc(data.length);
-	module.HEAPU8.set(data, inputPtr);
-	const ret = module.ccall(
-		'emu_load_file',
-		'number',
-		['string', 'number', 'number', 'number', 'number', 'number'],
-		[virtualPath, inputPtr, data.length, 48000, platform === 'nez' || platform === 'vgm' ? 1024 : -999, false]
-	);
-	module._free(inputPtr);
-
-	if (ret !== 0) {
-		throw new Error(`emu_load_file failed (${ret}) for ${fileRelPath}`);
-	}
+	const fallbackTitle = stripExtension(fileRelPath);
+	let module = null;
+	let loaded = false;
 
 	try {
+		module = await loadBackend(platform);
+		const data = sampleFileDataByPath.get(fileRelPath.toLowerCase())?.data;
+
+		if (!data) {
+			throw new Error(`Missing file data for ${fileRelPath}`);
+		}
+
+		const virtualPath = ensureFileInVirtualFs(module, fileRelPath, data);
+		runtimeState.module = module;
+		runtimeState.currentTrackRel = fileRelPath;
+
+		if (platform === 'vgm') {
+			try {
+				module.ccall('emu_set_resource_path', null, ['string'], [`${sampleVirtualRoot}/`]);
+			} catch {
+				// Older builds may not expose resource-path support.
+			}
+		}
+
+		const inputPtr = module._malloc(data.length);
+		module.HEAPU8.set(data, inputPtr);
+		const ret = module.ccall(
+			'emu_load_file',
+			'number',
+			['string', 'number', 'number', 'number', 'number', 'number'],
+			[virtualPath, inputPtr, data.length, 48000, platform === 'nez' || platform === 'vgm' ? 1024 : -999, false]
+		);
+		module._free(inputPtr);
+
+		if (ret !== 0) {
+			throw new Error(`emu_load_file failed (${ret}) for ${fileRelPath}`);
+		}
+
+		loaded = true;
+
 		if (platform === 'snes') {
 			// Game_Music_Emu-backed SNES metadata is populated by emu_set_subsong.
 			const subsongRet = module.ccall('emu_set_subsong', 'number', ['number'], [-1]);
@@ -744,13 +751,20 @@ async function extractTrackMetadata(fileRelPath) {
 			}
 		}
 
-		const metadata = readTrackInfo(module, platform, stripExtension(fileRelPath));
+		const metadata = readTrackInfo(module, platform, fallbackTitle);
 		return buildEntry(fileRelPath, metadata);
+	} catch (error) {
+		process.stderr.write(
+			`Falling back to filename for ${fileRelPath}: ${String(error.message || error)}\n`
+		);
+		return buildFilenameEntry(fileRelPath);
 	} finally {
-		try {
-			module.ccall('emu_teardown', 'number');
-		} catch {
-			// Keep indexing other files even if backend teardown fails.
+		if (loaded && module) {
+			try {
+				module.ccall('emu_teardown', 'number');
+			} catch {
+				// Keep indexing other files even if backend teardown fails.
+			}
 		}
 	}
 }

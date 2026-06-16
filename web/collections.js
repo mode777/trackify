@@ -1,5 +1,5 @@
 /*
- * Trackify games frame app.
+ * Trackify collections frame app.
  *
  * Responsibilities:
  * - Load games metadata from the shell service.
@@ -11,8 +11,8 @@
 import { createFrameBroker } from './broker.js';
 
 const els = {
-    grid: document.getElementById('gamesGrid'),
-    status: document.getElementById('gamesStatus'),
+    grid: document.getElementById('collectionsGrid'),
+    status: document.getElementById('collectionsStatus'),
 };
 
 const broker = createFrameBroker({
@@ -134,16 +134,16 @@ function renderGames() {
 
     games.forEach((game) => {
         const item = document.createElement('li');
-        item.className = 'game-card';
+        item.className = 'collection-card';
 
         const card = document.createElement('div');
-        card.className = 'game-link';
+        card.className = 'collection-link';
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-label', 'Open playlist for ' + game.title);
 
         const cover = document.createElement('div');
-        cover.className = 'game-cover';
+        cover.className = 'collection-cover';
         const coverUrl = safeCoverArtUrl(game.coverArt);
         if (coverUrl) {
             cover.classList.add('has-art');
@@ -152,21 +152,21 @@ function renderGames() {
 
         const playButton = document.createElement('button');
         playButton.type = 'button';
-        playButton.className = 'game-play-button material-symbols-outlined filled';
+        playButton.className = 'collection-play-button material-symbols-outlined filled';
         playButton.textContent = 'play_arrow';
         playButton.setAttribute('aria-label', 'Play ' + game.title);
         cover.appendChild(playButton);
 
         const body = document.createElement('div');
-        body.className = 'game-body';
+        body.className = 'collection-body';
 
         const title = document.createElement('h3');
-        title.className = 'game-title';
+        title.className = 'collection-title';
         title.textContent = game.title;
 
         const meta = buildMetaLine(game);
         const metaRow = document.createElement('p');
-        metaRow.className = 'game-meta';
+        metaRow.className = 'collection-meta';
 
         const companyText = meta.company || 'Unknown company';
         const yearText = meta.year || 'Unknown year';

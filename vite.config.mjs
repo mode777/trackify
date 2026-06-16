@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(rootDir, 'index.html'),
-        games: path.resolve(rootDir, 'games.html'),
+        collections: path.resolve(rootDir, 'collections.html'),
         playlist: path.resolve(rootDir, 'playlist.html'),
         player: path.resolve(rootDir, 'player.html'),
       },

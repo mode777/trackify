@@ -130,12 +130,30 @@ function renderTracks() {
         li.dataset.index = String(index);
         if (index === currentIndex) li.classList.add('active');
 
-        const number = document.createElement('span');
+        const number = document.createElement('button');
+        number.type = 'button';
         number.className = 'track-number';
-        number.textContent = String(index + 1);
+        number.setAttribute('aria-label', 'Play ' + track.title);
+
+        const numberLabel = document.createElement('span');
+        numberLabel.className = 'track-number-label';
+        numberLabel.textContent = String(index + 1);
+
+        const numberPlay = document.createElement('span');
+        numberPlay.className = 'track-number-play material-symbols-outlined filled';
+        numberPlay.setAttribute('aria-hidden', 'true');
+        numberPlay.textContent = 'play_arrow';
+
+        number.append(numberLabel, numberPlay);
+        number.addEventListener('click', () => {
+            publishSelected(index, true);
+        });
 
         const main = document.createElement('div');
         main.className = 'track-main';
+
+        const meta = document.createElement('div');
+        meta.className = 'track-meta';
 
         const name = document.createElement('span');
         name.className = 'track-name';
@@ -145,16 +163,25 @@ function renderTracks() {
         game.className = 'track-artist';
         game.textContent = track.game || PLACEHOLDER_GAME;
 
-        main.append(name, game);
+        meta.append(name, game);
+
+        const favorite = document.createElement('button');
+        favorite.type = 'button';
+        favorite.className = 'track-favorite';
+        favorite.setAttribute('aria-label', 'Add ' + track.title + ' to favorites');
+        const favoriteIcon = document.createElement('span');
+        favoriteIcon.className = 'material-symbols-outlined';
+        favoriteIcon.setAttribute('aria-hidden', 'true');
+        favoriteIcon.textContent = 'favorite_border';
+        favorite.append(favoriteIcon);
+
+        main.append(meta, favorite);
 
         const badge = document.createElement('span');
         badge.className = 'badge';
         badge.textContent = typeOf(track.file) || track.platform || '?';
 
         li.append(number, main, badge);
-        li.addEventListener('click', () => {
-            publishSelected(index, true);
-        });
         els.list.appendChild(li);
     });
 }
