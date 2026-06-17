@@ -500,9 +500,14 @@ function setStatus(message) {
         els.status.textContent = message;
     }
 
+    const currentTrackId = tracks[currentIndex] && typeof tracks[currentIndex].id === 'string'
+        ? tracks[currentIndex].id
+        : null;
+
     broker.publish('player.stateChanged', {
         status: message,
         currentIndex,
+        currentTrack: currentTrackId,
         busy,
         hasTracks: tracks.length > 0,
     }, { target: 'shell' });

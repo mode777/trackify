@@ -165,6 +165,7 @@ class TrackifyBroker {
     }
 
     logOutgoingMessage(message, targetWindow, targetOrigin) {
+        if (message.topic === 'player.mediaSessionSync') return;
         const toFrame = this.describeTargetFrame(message.target, targetWindow);
         console.info(`[Broker|${message.type}${message.correlationId ? `|${message.correlationId}` : ''}] ${this.serviceId}: ${message.topic}`, message.payload);
         // {

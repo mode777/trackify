@@ -434,6 +434,9 @@ function initBroker() {
     shellBroker.handleRequest('shell.queryUser', async () => {
         return makeAuthUserPayload();
     });
+    shellBroker.handleRequest('shell.queryFavorites', async () => {
+        return catalogService.queryFavorites();
+    });
 
     shellBroker.subscribe('player.mediaSessionSync', ({ payload }) => {
         syncShellMediaSession(payload);
@@ -442,6 +445,11 @@ function initBroker() {
     shellBroker.subscribe('playlist.liked', async ({ payload }) => {
         await catalogService.addFavorite(payload && payload.trackId);
         console.log('playlist.liked', payload && payload.trackId);
+    });
+
+    shellBroker.subscribe('playlist.unliked', async ({ payload }) => {
+        await catalogService.removeFavorite(payload && payload.trackId);
+        console.log('playlist.unliked', payload && payload.trackId);
     });
 
     shellBroker.subscribe('shell.user.login', async ({ payload }) => {
@@ -465,7 +473,9 @@ function init() {
     bindMediaKeyFallback();
     initBroker();
     if(pb.authStore.isValid) {
-        publishAuthLifecycleEvent('shell.user.login');
+        setTimeout(() => {
+            publishAuthLifecycleEvent('shell.user.login');
+        }, 10);
     }
 }
 

@@ -22,6 +22,7 @@ const EXT_GENH = ['genh'];
 
 const els = {
     heroArt: document.querySelector('.hero-art'),
+    heroEyebrow: document.getElementById('heroEyebrow'),
     heroTitle: document.getElementById('heroTitle'),
     heroCompany: document.getElementById('heroCompany'),
     heroYear: document.getElementById('heroYear'),
@@ -43,6 +44,7 @@ let currentIndex = -1;
 let playerReady = false;
 let pendingSelection = null;
 let playlistInfo = {};
+let favoriteTrackIds = new Set();
 
 function updateHeroArt(coverArt) {
     if (!els.heroArt) return;
@@ -115,6 +117,20 @@ function typeOf(file) {
     return null;
 }
 
+function applyFavoritesHeroState() {
+    document.body.classList.add('is-favorites');
+    if (els.heroEyebrow) els.heroEyebrow.textContent = 'Playlist';
+    if (els.heroTitle) els.heroTitle.textContent = 'Liked Tracks';
+    if (els.heroCompany) els.heroCompany.textContent = 'Your favorite tracks';
+    if (els.heroYear) els.heroYear.textContent = '';
+    if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
+}
+
+function clearFavoritesHeroState() {
+    document.body.classList.remove('is-favorites');
+    if (els.heroEyebrow) els.heroEyebrow.textContent = 'Game';
+}
+
 function setStatus(message) {
     if (els.status) {
         els.status.textContent = message;
@@ -168,15 +184,21 @@ function renderTracks() {
         const favorite = document.createElement('button');
         favorite.type = 'button';
         favorite.className = 'track-favorite';
-        favorite.setAttribute('aria-label', 'Add ' + track.title + ' to favorites');
         const favoriteIcon = document.createElement('span');
         favoriteIcon.className = 'material-symbols-outlined';
         favoriteIcon.setAttribute('aria-hidden', 'true');
-        favoriteIcon.textContent = 'favorite_border';
         favorite.append(favoriteIcon);
+        applyFavoriteState(favorite, track, favoriteTrackIds.has(track.id));
         favorite.addEventListener('click', (event) => {
             event.stopPropagation();
-            broker.publish('playlist.liked', { trackId: track.id }, { target: 'shell' });
+            if (favoriteTrackIds.has(track.id)) {
+                favoriteTrackIds.delete(track.id);
+                broker.publish('playlist.unliked', { trackId: track.id }, { target: 'shell' });
+            } else {
+                favoriteTrackIds.add(track.id);
+                broker.publish('playlist.liked', { trackId: track.id }, { target: 'shell' });
+            }
+            refreshFavoriteIcons();
         });
 
         main.append(meta, favorite);
@@ -188,6 +210,48 @@ function renderTracks() {
         li.append(number, main, badge);
         els.list.appendChild(li);
     });
+}
+
+function applyFavoriteState(button, track, isFavorite) {
+    button.classList.toggle('is-favorite', isFavorite);
+    const icon = button.querySelector('.material-symbols-outlined');
+    if (icon) {
+        icon.textContent = isFavorite ? 'favorite' : 'favorite_border';
+        icon.classList.toggle('filled', isFavorite);
+    }
+    button.setAttribute('aria-label', isFavorite
+        ? 'Remove ' + track.title + ' from favorites'
+        : 'Add ' + track.title + ' to favorites');
+}
+
+function refreshFavoriteIcons() {
+    if (!els.list) return;
+    const items = els.list.querySelectorAll('li');
+    items.forEach((li) => {
+        const index = Number(li.dataset.index);
+        const track = tracks[index];
+        if (!track) return;
+        const button = li.querySelector('.track-favorite');
+        if (!button) return;
+        applyFavoriteState(button, track, favoriteTrackIds.has(track.id));
+    });
+}
+
+async function queryFavorites() {
+    let favorites = [];
+    try {
+        favorites = await broker.request('shell.queryFavorites', null, {
+            target: 'shell',
+            timeoutMs: 4000,
+        });
+    } catch (_error) {
+        favorites = [];
+    }
+    favoriteTrackIds = new Set(
+        Array.isArray(favorites) ? favorites.map((track) => track && track.id).filter((id) => typeof id === 'string') : []
+    );
+    refreshFavoriteIcons();
+    return Array.isArray(favorites) ? favorites : [];
 }
 
 function publishSelected(index, autoplay) {
@@ -275,9 +339,16 @@ function getIndexFiltersFromFragment() {
 
     const params = new URLSearchParams(queryString);
     const game = params.get('game');
+    const favorites = params.has('favorites');
 
-    if (typeof game !== 'string' || !game.trim()) return {};
-    return { game: game.trim() };
+    const filters = {};
+    if (typeof game === 'string' && game.trim()) {
+        filters.game = game.trim();
+    }
+    if (favorites) {
+        filters.favorites = true;
+    }
+    return filters;
 }
 
 async function queryIndex(filters = {}) {
@@ -287,6 +358,7 @@ async function queryIndex(filters = {}) {
             timeoutMs: 15000,
         });
         handleIndexLoaded(payload);
+        queryFavorites();
     } catch (error) {
         console.error('Failed to query shell index', error);
         tracks = [];
@@ -317,8 +389,33 @@ async function queryGames(filters = {}) {
     }
 }
 
+async function loadFavoritesPlaylist() {
+    try {
+        const favorites = await queryFavorites();
+        handleIndexLoaded({
+            source: 'favorites',
+            tracks: favorites,
+            selectedIndex: favorites.length > 0 ? 0 : -1,
+        });
+    } catch (error) {
+        console.error('Failed to load favorites playlist', error);
+        tracks = [];
+        currentIndex = -1;
+        renderTracks();
+        setStatus('Error loading favorites (see console)');
+    }
+}
+
 function evaluateFragmentParameters() {
     const filters = getIndexFiltersFromFragment();
+
+    if (filters.favorites) {
+        applyFavoritesHeroState();
+        loadFavoritesPlaylist();
+        return;
+    }
+
+    clearFavoritesHeroState();
     queryIndex(filters);
 
     if (typeof filters.game === 'string' && filters.game) {
@@ -336,19 +433,24 @@ function bindBrokerHandlers() {
         }
     });
 
-    broker.subscribe('player.trackChanged', ({ payload }) => {
-        if (!payload || typeof payload.index !== 'number') return;
-        if (payload.index < 0 || payload.index >= tracks.length) return;
-
-        playerReady = true;
-        currentIndex = payload.index;
-        renderTracks();
-    });
-
     broker.subscribe('player.stateChanged', ({ payload }) => {
-        if (!payload || typeof payload.status !== 'string') return;
+        if (!payload) return;
         playerReady = true;
-        setStatus(payload.status);
+        if (typeof payload.status === 'string') {
+            setStatus(payload.status);
+        }
+
+        if (payload.currentTrack !== undefined) {
+            const currentTrackId = payload.currentTrack;
+            let newIndex = -1;
+            if (typeof currentTrackId === 'string' && currentTrackId) {
+                newIndex = tracks.findIndex((track) => track && track.id === currentTrackId);
+            }
+            if (newIndex !== currentIndex) {
+                currentIndex = newIndex;
+                renderTracks();
+            }
+        }
     });
 }
 

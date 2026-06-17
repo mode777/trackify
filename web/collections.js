@@ -83,13 +83,16 @@ function openPlaylist(gameTitle) {
     window.location.assign(target);
 }
 
-async function playGame(gameTitle) {
-    if (typeof gameTitle !== 'string' || !gameTitle.trim()) return;
+async function playGame(game) {
+    if (!game || typeof game.id !== 'string' || !game.id.trim()) return;
+
+    const gameId = game.id.trim();
+    const gameTitle = typeof game.title === 'string' ? game.title.trim() : '';
 
     setStatus('Loading tracks for ' + gameTitle + '...');
 
     try {
-        const payload = await broker.request('shell.queryIndex', { game: gameTitle }, {
+        const payload = await broker.request('shell.queryIndex', { game: gameId }, {
             target: 'shell',
             timeoutMs: 15000,
         });
@@ -192,7 +195,7 @@ function renderGames() {
 
         playButton.addEventListener('click', (event) => {
             event.stopPropagation();
-            playGame(game.title);
+            playGame(game);
         });
     });
 }
