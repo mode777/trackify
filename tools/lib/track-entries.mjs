@@ -13,6 +13,7 @@ import {
 import { ensureFileInVirtualFs } from './wasm-vfs.mjs';
 import { loadBackend } from './backend-loader.mjs';
 import { readTrackInfo } from './metadata-readers.mjs';
+import { readMp3Metadata } from './mp3-metadata-reader.mjs';
 
 export function buildEntry(fileRelPath, metadata) {
 	const pathParts = getPathParts(fileRelPath);
@@ -52,6 +53,15 @@ export async function extractTrackMetadata(ctx, fileRelPath) {
 			length: -1,
 			metadata: { title: fallbackTitle, artist: '', game: '', detail },
 		});
+	}
+
+	if (platform === 'mp3') {
+		const data = ctx.files.get(fileRelPath.toLowerCase())?.data;
+		if (!data) {
+			throw new Error(`Missing file data for ${fileRelPath}`);
+		}
+		const mp3Meta = await readMp3Metadata(data, fallbackTitle);
+		return buildEntry(fileRelPath, mp3Meta);
 	}
 
 	let module = null;

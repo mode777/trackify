@@ -19,6 +19,7 @@ export const EXT_PLATFORM = {
 	dro: 'vgm',
 	xa: 'xa',
 	genh: 'genh',
+	mp3: 'mp3',
 };
 
 export function getExtension(fileRelPath) {
