@@ -12,14 +12,6 @@ import { createFrameBroker } from './broker.js';
 
 const PLACEHOLDER_GAME = 'Unknown game';
 
-const EXT_PSX = ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'];
-const EXT_SNES = ['spc', 'rsn'];
-const EXT_NEZ = ['bgm', 'opx', 'nsf', 'sng', 'kss'];
-const EXT_N64 = ['usf', 'miniusf', 'usflib'];
-const EXT_VGM = ['vgm', 'vgz', 'cmf', 'dro'];
-const EXT_XA = ['xa'];
-const EXT_GENH = ['genh'];
-
 const els = {
     heroArt: document.querySelector('.hero-art'),
     heroEyebrow: document.getElementById('heroEyebrow'),
@@ -107,14 +99,7 @@ function extOf(file) {
 
 function typeOf(file) {
     const ext = extOf(file);
-    if (EXT_GENH.includes(ext)) return 'genh';
-    if (EXT_XA.includes(ext)) return 'xa';
-    if (EXT_VGM.includes(ext)) return 'vgm';
-    if (EXT_N64.includes(ext)) return 'n64';
-    if (EXT_NEZ.includes(ext)) return 'nez';
-    if (EXT_SNES.includes(ext)) return 'snes';
-    if (EXT_PSX.includes(ext)) return 'psx';
-    return null;
+    return ext.toString().toUpperCase().replace("MINI", "") || null;
 }
 
 function applyFavoritesHeroState() {
@@ -177,7 +162,7 @@ function renderTracks() {
 
         const game = document.createElement('span');
         game.className = 'track-artist';
-        game.textContent = track.game || PLACEHOLDER_GAME;
+        game.textContent = track.artist || track.game || PLACEHOLDER_GAME;
 
         meta.append(name, game);
 
