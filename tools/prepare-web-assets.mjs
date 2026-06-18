@@ -7,6 +7,7 @@ const publicDir = path.join(root, 'build', 'web-public');
 const publicWasmDir = path.join(publicDir, 'wasm');
 const xaBackendSourceFile = path.join(root, 'web', 'backend_xa.js');
 const genhBackendSourceFile = path.join(root, 'web', 'backend_genh.js');
+const mp3BackendSourceFile = path.join(root, 'web', 'backend_mp3.js');
 
 const requiredRuntimeFiles = [
   'scriptprocessor_player.js',
@@ -62,6 +63,11 @@ async function copyRuntimeArtifacts() {
   await fs.copyFile(
     genhBackendSourceFile,
     path.join(publicWasmDir, 'backend_genh.js')
+  );
+
+  await fs.copyFile(
+    mp3BackendSourceFile,
+    path.join(publicWasmDir, 'backend_mp3.js')
   );
 }
 

@@ -17,6 +17,7 @@ const EXT_N64 = ['usf', 'miniusf', 'usflib'];
 const EXT_VGM = ['vgm', 'vgz', 'cmf', 'dro'];
 const EXT_XA = ['xa'];
 const EXT_GENH = ['genh'];
+const EXT_MP3 = ['mp3'];
 
 const runtime = globalThis;
 const BACKEND_SCRIPT_BY_TYPE = {
@@ -27,6 +28,7 @@ const BACKEND_SCRIPT_BY_TYPE = {
     vgm: '/wasm/backend_vgm.js',
     xa: '/wasm/backend_xa.js',
     genh: '/wasm/backend_genh.js',
+    mp3: '/wasm/backend_mp3.js',
 };
 const BACKEND_LOAD_TIMEOUT_MS = 15000;
 const SEEK_POLL_MS = 250;
@@ -142,25 +144,6 @@ const els = {
     timeTotal: document.getElementById('timeTotal'),
 };
 
-function normalizeInfoMap(info) {
-    const normalized = {};
-    if (!info || typeof info !== 'object') return normalized;
-
-    for (const [key, value] of Object.entries(info)) {
-        normalized[String(key).toLowerCase()] = value;
-    }
-    return normalized;
-}
-
-function firstInfoValue(infoMap, keys) {
-    for (const key of keys) {
-        const value = infoMap[key];
-        if (value === undefined || value === null || value === '') continue;
-        return String(value);
-    }
-    return null;
-}
-
 function extOf(file) {
     return file.slice(file.lastIndexOf('.') + 1).toLowerCase();
 }
@@ -174,14 +157,13 @@ function typeOf(file) {
     if (EXT_NEZ.includes(ext)) return 'nez';
     if (EXT_SNES.includes(ext)) return 'snes';
     if (EXT_PSX.includes(ext)) return 'psx';
+    if (EXT_MP3.includes(ext)) return 'mp3';
     return null;
 }
 
-function updateNowPlayingMeta(track, songInfo) {
-    const infoMap = normalizeInfoMap(songInfo);
-
-    const title = firstInfoValue(infoMap, ['title', 'song', 'track', 'name']) || (track ? track.title : 'No track selected');
-    const game = firstInfoValue(infoMap, ['game', 'album', 'source', 'system']) || (track ? (track.game || 'Unknown game') : 'Unknown game');
+function updateNowPlayingMeta(track) {
+    const title = track ? track.title : 'No track selected';
+    const game = track ? (track.game || 'Unknown game') : 'Unknown game';
 
     if (els.trackTitle) {
         els.trackTitle.textContent = title;
@@ -191,7 +173,7 @@ function updateNowPlayingMeta(track, songInfo) {
         els.trackMeta.textContent = game + ' - ' + typeLabel;
     }
 
-    syncMediaSessionMetadata(track, infoMap);
+    syncMediaSessionMetadata(track);
 }
 
 function updateNowPlayingThumb(track) {
@@ -213,7 +195,7 @@ function updateNowPlayingThumb(track) {
     els.thumb.style.setProperty('--thumb-bg', 'url("' + resolvedCoverArt.replace(/"/g, '\\"') + '")');
 
     // Keep media session artwork aligned when only cover art changed.
-    syncMediaSessionMetadata(track, normalizeInfoMap(readSongInfo()));
+    syncMediaSessionMetadata(track);
 }
 
 function supportsMediaSession() {
@@ -233,9 +215,7 @@ function getPreferredTrackArtist(track) {
     if (track && typeof track.artist === 'string' && track.artist.trim()) {
         return track.artist.trim();
     }
-
-    const infoMap = normalizeInfoMap(readSongInfo());
-    return firstInfoValue(infoMap, ['artist', 'composer', 'arranger']) || '';
+    return '';
 }
 
 function createMediaArtworkList(track) {
@@ -252,11 +232,10 @@ function createMediaArtworkList(track) {
     return [{ src }];
 }
 
-function buildMediaMetadataPayload(track, infoMap) {
-    const normalized = normalizeInfoMap(infoMap);
-    const title = firstInfoValue(normalized, ['title', 'song', 'track', 'name']) || (track ? track.title : 'Trackify');
-    const album = firstInfoValue(normalized, ['game', 'album', 'source']) || (track ? (track.game || '') : '');
-    const artist = firstInfoValue(normalized, ['artist', 'composer', 'arranger']) || getPreferredTrackArtist(track);
+function buildMediaMetadataPayload(track) {
+    const title = track ? track.title : 'Trackify';
+    const album = track ? (track.game || '') : '';
+    const artist = getPreferredTrackArtist(track);
     const artwork = createMediaArtworkList(track);
 
     return {
@@ -269,8 +248,7 @@ function buildMediaMetadataPayload(track, infoMap) {
 
 function publishMediaSessionSync(partialPayload = {}) {
     const track = tracks[currentIndex] || null;
-    const infoMap = normalizeInfoMap(readSongInfo());
-    const metadata = buildMediaMetadataPayload(track, infoMap);
+    const metadata = buildMediaMetadataPayload(track);
     const player = runtime.ScriptNodePlayer.getInstance();
     let playbackState = 'none';
     if (player) {
@@ -297,8 +275,8 @@ function publishMediaSessionSync(partialPayload = {}) {
     }, { target: 'shell' });
 }
 
-function syncMediaSessionMetadata(track, infoMap) {
-    const metadata = buildMediaMetadataPayload(track, infoMap);
+function syncMediaSessionMetadata(track) {
+    const metadata = buildMediaMetadataPayload(track);
     const metadataKey = JSON.stringify(metadata);
 
     if (supportsMediaSession() && mediaSessionState.metadataKey !== metadataKey) {
@@ -640,6 +618,10 @@ function installPointerStringifyShim(moduleNamespace) {
 }
 
 function getAdapterCtor(type) {
+    if (type === 'mp3') {
+        return runtime.Mp3BackendAdapter ||
+            (typeof Mp3BackendAdapter !== 'undefined' ? Mp3BackendAdapter : null);
+    }
     if (type === 'genh') {
         return runtime.GenhBackendAdapter ||
             (typeof GenhBackendAdapter !== 'undefined' ? GenhBackendAdapter : null);
@@ -771,21 +753,6 @@ function makeAdapter(type) {
     return new adapterCtor();
 }
 
-function readSongInfo() {
-    const player = runtime.ScriptNodePlayer.getInstance();
-    if (!player) return null;
-
-    let info;
-    try {
-        info = player.getSongInfo();
-    } catch (_error) {
-        return null;
-    }
-
-    if (!info) return null;
-    return info;
-}
-
 function updatePlayButton() {
     if (!els.play) return;
 
@@ -823,7 +790,7 @@ async function selectTrack(index, autoplay) {
     } else {
         setStatus('Loading "' + track.title + '"...');
     }
-    updateNowPlayingMeta(track, null);
+    updateNowPlayingMeta(track);
     updateNowPlayingThumb(track);
     resetSeekUi();
 
@@ -838,9 +805,6 @@ async function selectTrack(index, autoplay) {
         await runtime.ScriptNodePlayer.initialize(adapter, onTrackEnd, [], false);
         await runtime.ScriptNodePlayer.loadMusicFromURL(track.file, {});
 
-        const songInfo = readSongInfo();
-        updateNowPlayingMeta(track, songInfo);
-        updateNowPlayingThumb(track);
         syncVolumeUiFromPlayer();
         refreshSeekUi();
 
@@ -910,7 +874,7 @@ function handlePlaylistSelected(payload, autoplay) {
 
     if (!tracks.length) {
         currentIndex = -1;
-        updateNowPlayingMeta(null, null);
+        updateNowPlayingMeta(null);
         updateNowPlayingThumb(null);
         setStatus('Playlist is empty');
         return;
@@ -919,7 +883,7 @@ function handlePlaylistSelected(payload, autoplay) {
     const preferredIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : 0;
     const boundedIndex = Math.max(0, Math.min(tracks.length - 1, preferredIndex));
     currentIndex = boundedIndex;
-    updateNowPlayingMeta(tracks[currentIndex], null);
+    updateNowPlayingMeta(tracks[currentIndex]);
     updateNowPlayingThumb(tracks[currentIndex]);
     setStatus('Playlist loaded');
     if (autoplay) {
@@ -1046,7 +1010,7 @@ function init() {
     updatePlayButton();
     resetSeekUi();
     setStatus('Waiting for playlist...');
-    syncMediaSessionMetadata(null, null);
+    syncMediaSessionMetadata(null);
     syncMediaSessionPlaybackState();
     publishMediaSessionSync();
 

@@ -13,6 +13,7 @@ const required = [
   'wasm/backend_vgm.js',
   'wasm/backend_xa.js',
   'wasm/backend_genh.js',
+  'wasm/backend_mp3.js',
   'wasm/psx.wasm',
   'wasm/snes.wasm',
   'wasm/nez.wasm',
