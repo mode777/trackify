@@ -409,6 +409,8 @@ async function loadFavoritesPlaylist() {
 function evaluateFragmentParameters() {
     const filters = getIndexFiltersFromFragment();
 
+    updateHeroArt('');
+
     if (filters.favorites) {
         applyFavoritesHeroState();
         loadFavoritesPlaylist();
