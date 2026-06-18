@@ -26,7 +26,8 @@ let getCurrentIndex = () => -1;
 let getLastPlaybackState = () => 'none';
 let playCurrentOrSelectedFn = () => {};
 let pausePlaybackFn = () => {};
-let selectTrackFn = () => {};
+let selectNextTrackFn = () => {};
+let selectPreviousTrackFn = () => {};
 let seekRelativeBySecondsFn = () => {};
 let seekToSecondsFn = () => {};
 
@@ -37,7 +38,8 @@ export function initMediaSessionSync(deps) {
     getLastPlaybackState = deps.getLastPlaybackState || (() => 'none');
     playCurrentOrSelectedFn = deps.playCurrentOrSelected || (() => {});
     pausePlaybackFn = deps.pausePlayback || (() => {});
-    selectTrackFn = deps.selectTrack || (() => {});
+    selectNextTrackFn = deps.selectNextTrack || (() => {});
+    selectPreviousTrackFn = deps.selectPreviousTrack || (() => {});
     seekRelativeBySecondsFn = deps.seekRelativeBySeconds || (() => {});
     seekToSecondsFn = deps.seekToSeconds || (() => {});
 }
@@ -216,16 +218,12 @@ export function bindMediaSessionHandlers() {
         pausePlaybackFn();
     });
     safeSetMediaActionHandler('previoustrack', () => {
-        const tracksSnapshot = getTracks();
-        if (!tracksSnapshot.length) return;
-        const next = (getCurrentIndex() - 1 + tracksSnapshot.length) % tracksSnapshot.length;
-        selectTrackFn(next, true);
+        if (!getTracks().length) return;
+        selectPreviousTrackFn(true);
     });
     safeSetMediaActionHandler('nexttrack', () => {
-        const tracksSnapshot = getTracks();
-        if (!tracksSnapshot.length) return;
-        const next = (getCurrentIndex() + 1 + tracksSnapshot.length) % tracksSnapshot.length;
-        selectTrackFn(next, true);
+        if (!getTracks().length) return;
+        selectNextTrackFn(true);
     });
     safeSetMediaActionHandler('seekbackward', (details) => {
         const step = Number(details && details.seekOffset);

@@ -8,6 +8,7 @@
 'use strict';
 
 export const els = {
+    shuffle: document.getElementById('shuffleBtn'),
     prev: document.getElementById('prevBtn'),
     play: document.getElementById('playBtn'),
     next: document.getElementById('nextBtn'),

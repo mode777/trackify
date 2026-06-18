@@ -22,6 +22,7 @@ import {
     refreshSeekUi,
     resetSeekUi,
 } from './player/seek_ui.js';
+import { bindShuffleUi } from './player/shuffle_ui.js';
 import {
     initMediaSessionSync,
     bindMediaSessionHandlers,
@@ -33,7 +34,8 @@ import {
 import {
     initTransport,
     handlePlaylistSelected,
-    selectTrack,
+    selectNextTrack,
+    selectPreviousTrack,
     playCurrentOrSelected,
     pausePlayback,
     togglePlay,
@@ -43,6 +45,7 @@ import {
     getCurrentIndex,
     isBusy,
     getLastPlaybackState,
+    isShuffleEnabled,
 } from './player/transport.js';
 
 const broker = createFrameBroker({
@@ -53,15 +56,11 @@ const broker = createFrameBroker({
 });
 
 function nextTrack() {
-    const tracksSnapshot = getTracks();
-    if (!tracksSnapshot.length) return;
-    selectTrack((getCurrentIndex() + 1 + tracksSnapshot.length) % tracksSnapshot.length, true);
+    selectNextTrack(true);
 }
 
 function previousTrack() {
-    const tracksSnapshot = getTracks();
-    if (!tracksSnapshot.length) return;
-    selectTrack((getCurrentIndex() - 1 + tracksSnapshot.length) % tracksSnapshot.length, true);
+    selectPreviousTrack(true);
 }
 
 function bindPlayPauseUi() {
@@ -102,6 +101,14 @@ function bindBrokerHandlers() {
         previousTrack();
     });
 
+    broker.subscribe('player.shuffle.toggle', () => {
+        toggleShuffle();
+        if (els.shuffle) {
+            els.shuffle.classList.toggle('active', isShuffleEnabled());
+            els.shuffle.setAttribute('aria-pressed', isShuffleEnabled() ? 'true' : 'false');
+        }
+    });
+
     broker.subscribe('player.seek.relative', ({ payload }) => {
         const seconds = Number(payload && payload.seconds);
         if (!Number.isFinite(seconds) || seconds === 0) return;
@@ -131,7 +138,8 @@ function init() {
         getLastPlaybackState,
         playCurrentOrSelected,
         pausePlayback,
-        selectTrack: (index, autoplay) => selectTrack(index, autoplay),
+        selectNextTrack,
+        selectPreviousTrack,
         seekRelativeBySeconds,
         seekToSeconds,
     });
@@ -141,6 +149,7 @@ function init() {
     bindPlayPauseUi();
     bindVolumeUi();
     bindSeekUi({ syncMediaSessionPositionState });
+    bindShuffleUi();
     bindMediaSessionHandlers();
 
     bindBrokerHandlers();

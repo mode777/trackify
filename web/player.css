@@ -100,7 +100,10 @@ body {
 .controls {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 14px;
+    width: min(560px, 100%);
+    position: relative;
 }
 
 .controls button {
@@ -129,6 +132,27 @@ body {
 #prevBtn .material-symbols-outlined,
 #nextBtn .material-symbols-outlined {
     font-size: 32px;
+}
+
+#shuffleBtn {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+}
+
+#shuffleBtn .material-symbols-outlined {
+    font-size: 26px;
+}
+
+#shuffleBtn.active {
+    color: var(--accent);
+}
+
+#shuffleBtn.active .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
 #playBtn {
