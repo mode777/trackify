@@ -6,6 +6,17 @@ output layout) lives in the top-level [`README.md`](../README.md); this
 document covers the contract between the player runtime and a backend,
 how each backend is built, and how to add or port a new one.
 
+> **Planned AudioWorklet migration.** The current player runtime
+> (`scriptprocessor_player.js` from the upstream
+> `submodules/webaudio-player`) is built on the deprecated
+> `ScriptProcessorNode`. The replacement design — moving the entire hot
+> path (WASM module + adapter + `OutputTransformer`) into an
+> `AudioWorkletGlobalScope` while preserving the public
+> `ScriptNodePlayer` API — is documented in
+> [`docs/audio-worklet-migration.md`](./audio-worklet-migration.md). That
+> document also lists the per-file adoption and a milestone-by-milestone
+> roadmap (WP-0 … WP-H).
+
 ## 1. The backend catalog
 
 | Backend key | Source core                       | Build        | Extensions                                                       | `INITIAL_MEMORY` |

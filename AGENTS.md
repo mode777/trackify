@@ -2,8 +2,10 @@
 
 VGM (Video Game Music) web player. Hybrid build: CMake + Emscripten for WASM
 backend cores, Node + Vite for the UI, PocketBase for catalog metadata.
-Sources of truth for full context: `README.md` (architecture, ABI, build flow)
-and `ui.md` (iframe broker contract).
+Sources of truth for full context: `README.md` (architecture, ABI, build flow),
+`ui.md` (iframe broker contract), and `docs/audio-worklet-migration.md`
+(planned migration of the audio hot path from `ScriptProcessorNode` to
+`AudioWorkletNode`).
 
 ## One-time setup
 
@@ -81,6 +83,8 @@ Glue lives in the repo:
 - webn64: `-fno-rtti`, `-sDISABLE_EXCEPTION_CATCHING=1`, 128 MB
   `INITIAL_MEMORY`. CPU-intensive — the N64 adapter uses a 0x4000-sample
   `ScriptProcessor` buffer to compensate for missing dynarec.
+  (Deprecated: see `docs/audio-worklet-migration.md` WP-H, which moves
+  to `AudioWorkletNode` and removes the buffer hack.)
 - vgmplay: must keep `--js-library ${VGM_EMS}/callback.js`,
   `ENABLE_ALL_CORES`/`FM_EMU`/`ADDITIONAL_FORMATS` defines,
   `-Wl,--allow-multiple-definition`, `-sERROR_ON_UNDEFINED_SYMBOLS=0`.
