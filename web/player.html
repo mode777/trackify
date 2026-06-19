@@ -14,7 +14,28 @@
     // Generated backend wrappers read this prefix in locateFile(path).
     window.WASM_SEARCH_PATH = 'wasm/';
 </script>
-<script src="/wasm/scriptprocessor_player.js"></script>
+<script src="/player/worklet_player/feature_flag.js"></script>
+<script>
+    // Pick the player runtime: AudioWorklet (default) or the legacy
+    // ScriptProcessorNode pipeline. `?wp=0` in the URL flips the
+    // entire stack back to the legacy pipeline; see
+    // docs/audio-worklet-migration.md §9 (WP-E).
+    (function () {
+        var useWp = (typeof window.wpUseWorkletPlayer === 'function')
+            ? window.wpUseWorkletPlayer()
+            : true;
+        var src = useWp ? '/wasm/wp_player.js' : '/wasm/scriptprocessor_player.js';
+        var s = document.createElement('script');
+        s.src = src;
+        s.async = false;
+        document.head.appendChild(s);
+        try {
+            console.info('[trackify] audio pipeline: ' +
+                (useWp ? 'AudioWorklet' : 'legacy ScriptProcessorNode') +
+                (useWp && typeof AudioWorkletNode === 'undefined' ? ' (fallback to legacy — worklet unsupported)' : ''));
+        } catch (_e) { /* ignore */ }
+    })();
+</script>
 </head>
 <body>
 <div class="player-root">

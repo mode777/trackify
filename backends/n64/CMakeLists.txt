@@ -134,19 +134,22 @@ target_link_options(n64 PRIVATE
     "--js-library" "${N64_EMS}/callback.js")
 
 # ---- Assemble backend_n64.js = shell-pre + n64.js + shell-post + adapter ----
+# `n64_adapter.js` is sourced from patches/webn64/emscripten/ (it drops
+# the legacy setProcessorBufSize(0x4000) hack — see
+# docs/audio-worklet-migration.md WP-H).
 set(N64_BACKEND_JS "${DIST_DIR}/backend_n64.js")
 add_custom_command(
     OUTPUT "${N64_BACKEND_JS}"
     COMMAND "${CMAKE_COMMAND}"
             -DOUTPUT=${N64_BACKEND_JS}
-            "-DINPUTS=${N64_EMS}/shell-pre.js;${CMAKE_CURRENT_BINARY_DIR}/n64.js;${N64_EMS}/shell-post.js;${N64_EMS}/n64_adapter.js"
+            "-DINPUTS=${N64_EMS}/shell-pre.js;${CMAKE_CURRENT_BINARY_DIR}/n64.js;${N64_EMS}/shell-post.js;${N64_EMS_PATCH}/n64_adapter.js"
             -P "${CONCAT_SCRIPT}"
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${CMAKE_CURRENT_BINARY_DIR}/n64.wasm" "${DIST_DIR}/n64.wasm"
     DEPENDS n64
             "${N64_EMS}/shell-pre.js"
             "${N64_EMS}/shell-post.js"
-            "${N64_EMS}/n64_adapter.js"
+            "${N64_EMS_PATCH}/n64_adapter.js"
             "${CONCAT_SCRIPT}"
     VERBATIM
     COMMENT "Assembling backend_n64.js (+ n64.wasm)")

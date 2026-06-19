@@ -8,9 +8,12 @@ const publicWasmDir = path.join(publicDir, 'wasm');
 const xaBackendSourceFile = path.join(root, 'web', 'backend_xa.js');
 const genhBackendSourceFile = path.join(root, 'web', 'backend_genh.js');
 const mp3BackendSourceFile = path.join(root, 'web', 'backend_mp3.js');
+const wpPlayerSourceFile = path.join(root, 'web', 'player', 'worklet_player', 'wp_player.js');
 
 const requiredRuntimeFiles = [
   'scriptprocessor_player.js',
+  'wp_player.js',
+  'wp_worklet.js',
   'backend_psx.js',
   'backend_snes.js',
   'backend_nez.js',
@@ -68,6 +71,11 @@ async function copyRuntimeArtifacts() {
   await fs.copyFile(
     mp3BackendSourceFile,
     path.join(publicWasmDir, 'backend_mp3.js')
+  );
+
+  await fs.copyFile(
+    wpPlayerSourceFile,
+    path.join(publicWasmDir, 'wp_player.js')
   );
 }
 

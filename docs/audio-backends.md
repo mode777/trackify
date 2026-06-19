@@ -335,3 +335,89 @@ add another pure-JS backend:
 4. If `ShellCatalogService` needs to know about the new extensions
    for filename → backend mapping, mirror the entry in
    `web/catalog_service.js#EXTENSIONS`.
+
+## 10. AudioWorklet pipeline
+
+The new `AudioWorkletNode` pipeline replaces the deprecated
+`ScriptProcessorNode` runtime. The entire hot path (Emscripten WASM
+module, per-backend adapter, `OutputTransformer`) now runs inside
+an `AudioWorkletGlobalScope`. The public `globalThis.ScriptNodePlayer`
+API is preserved by a thin main-thread proxy so the rest of the
+Trackify player modules (`web/player/transport.js`,
+`web/player/seek_ui.js`, …) are unchanged.
+
+### 10.1 File layout
+
+| File | Purpose |
+| --- | --- |
+| `web/player/worklet_player/feature_flag.js` | Reads `?wp=0` and `localStorage.trackify.wpPlayerOverride`; exposes `wpUseWorkletPlayer()`. |
+| `web/player/worklet_player/wp_player.js` | Main-thread proxy. Defines `globalThis.ScriptNodePlayer` and a minimal `ScriptNodeBackendAdapter` / `BaseFileMapper` stub for `Mp3BackendAdapter`. |
+| `web/player/worklet_player/wp_player_shim.js` | Worklet-side `WpPlayerShim` and `ScriptNodePlayer` shim (concatenated into `wp_worklet.js`). |
+| `web/player/worklet_player/wp_worklet_processor.js` | `WpWorkletProcessor` base class + per-backend `registerProcessor` calls (concatenated into `wp_worklet.js`). |
+| `build/wasm/wp_player.js` | Build artifact, copied by `tools/prepare-web-assets.mjs`. |
+| `build/wasm/wp_worklet.js` | Build artifact, concatenated by the `wp_worklet` CMake target. |
+
+### 10.2 Build chain
+
+The root `CMakeLists.txt` adds a `wp_worklet` target that concatenates
+the upstream player runtime classes (`submodules/webaudio-player/src/impl/*`)
+with the new `wp_player_shim.js` and `wp_worklet_processor.js`. The
+proxy `web/player/worklet_player/wp_player.js` is plain JavaScript and
+is copied into `build/web-public/wasm/` by `prepare-web-assets.mjs`.
+
+`wp_player.js`, `wp_worklet.js` and the legacy `scriptprocessor_player.js`
+must all be listed in **both** `tools/prepare-web-assets.mjs#requiredRuntimeFiles`
+and `tools/verify-build-output.mjs#required`; the new files are gated
+behind the worklet feature flag.
+
+### 10.3 Message protocol
+
+The proxy and the worklet communicate over the
+`AudioWorkletNode.port` `MessagePort`. See
+`docs/audio-worklet-migration.md` §4.2.1 for the full schema. In
+summary:
+
+- main → worklet: `{ cmd: 'init' | 'loadFile' | 'play' | 'pause' |
+  'seek' | 'setVolume' | 'getPosition' | 'loadAuxFile' | 'teardown' }`
+- worklet → main: `{ kind: 'ready' | 'backendReady' | 'adapterReady' |
+  'trackReadyToPlay' | 'trackEnd' | 'position' | 'isPaused' |
+  'error' | 'fileNotReady' | 'requestFile' }`
+
+The worklet throttles `position` updates to ~10 Hz so the main-thread
+cache stays warm for the 250 ms UI poll in `web/player/seek_ui.js`
+without flooding the message channel.
+
+### 10.4 MP3 exception
+
+`Mp3BackendAdapter` is the one backend that does not move to the
+worklet. The proxy detects it in `initialize()` (by
+`adapter.constructor.name === 'Mp3BackendAdapter'`) and routes through
+a `WpMp3Bridge` that uses the existing
+`adapter._createProducerNode(audioCtx)` →
+`MediaElementAudioSourceNode` → `GainNode` → `AudioContext.destination`
+graph on the main thread. `web/backend_mp3.js` is unchanged.
+
+The main-thread proxy carries a minimal `ScriptNodeBackendAdapter` /
+`BaseFileMapper` stub pair so the `Mp3BackendAdapter` `extends` chain
+still resolves; the MP3 adapter overrides every method it actually
+uses, so the stubs are no-op defaults.
+
+### 10.5 Feature flag & fallback
+
+`?wp=0` in the URL flips the entire stack to the legacy
+`scriptprocessor_player.js` pipeline. `?wp=1` (or no flag) uses the
+new worklet pipeline. A `localStorage` key
+(`trackify.wpPlayerOverride`) takes precedence over the URL for
+ops-driven overrides. When `AudioWorkletNode` is undefined in
+`globalThis`, the flag also forces the legacy pipeline.
+
+### 10.6 N64 buffer hack (G6 / WP-H)
+
+The N64 adapter's legacy `setProcessorBufSize(0x4000)` call (which
+amortised the slow N64 emulator across a 16384-sample ScriptProcessor
+buffer) is no longer needed: the worklet's 128-sample quantum is
+faster than a single onaudioprocess call, and the main thread no
+longer competes with the audio thread. The override is in
+`patches/webn64/emscripten/n64_adapter.js` (used in place of the
+upstream `submodules/webn64/emscripten/n64_adapter.js` by
+`backends/n64/CMakeLists.txt`).

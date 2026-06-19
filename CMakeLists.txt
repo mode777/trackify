@@ -79,6 +79,30 @@ add_concat_command("${PLAYER_JS}"
     "${WEBAUDIO_SRC}/ScriptNodePlayer.js")
 add_custom_target(player ALL DEPENDS "${PLAYER_JS}")
 
+# ---- AudioWorklet runtime (see docs/audio-worklet-migration.md) ------------
+# Reuses the upstream player runtime classes (OutputTransformer,
+# ScriptNodeBackendAdapter, etc.) and replaces ScriptNodePlayer.js
+# with the Trackify WpWorkletProcessor / WpPlayerShim pair. The
+# resulting bundle is loaded once per AudioContext via
+# `audioWorklet.addModule('/wasm/wp_worklet.js')`.
+set(WP_WORKLET_DIR "${CMAKE_SOURCE_DIR}/web/player/worklet_player")
+set(WP_WORKLET_JS "${DIST_DIR}/wp_worklet.js")
+add_concat_command("${WP_WORKLET_JS}"
+    "${WP_WORKLET_DIR}/header.txt"
+    "${WEBAUDIO_SRC}/impl/Utils.js"
+    "${WEBAUDIO_SRC}/AbstractTicker2.js"
+    "${WEBAUDIO_SRC}/BaseFileMapper.js"
+    "${WEBAUDIO_SRC}/impl/SimpleFileMapper.js"
+    "${WEBAUDIO_SRC}/ScopeDataProvider.js"
+    "${WEBAUDIO_SRC}/impl/EmscriptenScopeProviders.js"
+    "${WEBAUDIO_SRC}/AudioBackendAdapterBase.js"
+    "${WEBAUDIO_SRC}/impl/OutputTransformer.js"
+    "${WEBAUDIO_SRC}/impl/ScriptNodeBackendAdapter.js"
+    "${WEBAUDIO_SRC}/impl/EmscriptenScriptNodeBackendAdapters.js"
+    "${WP_WORKLET_DIR}/wp_player_shim.js"
+    "${WP_WORKLET_DIR}/wp_worklet_processor.js")
+add_custom_target(wp_worklet ALL DEPENDS "${WP_WORKLET_JS}")
+
 # ---- Backends ---------------------------------------------------------------
 add_subdirectory(backends/psx)
 add_subdirectory(backends/snes)

@@ -1,0 +1,14 @@
+/**
+ * Trackify AudioWorklet player (worklet side).
+ *
+ * Bundled by CMake from submodules/webaudio-player/src/impl/* and
+ * web/player/worklet_player/*. The hot path (Emscripten WASM module,
+ * backend adapter, OutputTransformer) lives inside the
+ * AudioWorkletGlobalScope; the main thread drives the player through a
+ * MessageChannel that the proxy (`wp_player.js`) and the
+ * WpWorkletProcessor base class share.
+ *
+ * Backends registered: psx, snes, nez, n64, vgm, xa, genh. MP3 is
+ * handled on the main thread by the proxy and does not use the
+ * worklet.
+ */

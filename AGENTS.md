@@ -23,7 +23,7 @@ All npm scripts live in `package.json`. The interesting chains:
 
 - `npm run build` = `npm run wasm` + `npm run assets:prepare` + `vite build`.
   - `npm run wasm` = `emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON` then
-    `cmake --build build --target player backend_psx backend_snes backend_nez backend_n64 backend_vgm`.
+    `cmake --build build --target player backend_psx backend_snes backend_nez backend_n64 backend_vgm wp_worklet`.
   - `npm run assets:prepare` (=`node tools/prepare-web-assets.mjs`) copies the
     CMake artifacts from `build/wasm/` into `build/web-public/wasm/`. It
     **fails hard** if the CMake runtime files are missing — never run it
@@ -40,9 +40,10 @@ All npm scripts live in `package.json`. The interesting chains:
 Output layout:
 
 - `build/wasm/` — CMake-emitted `backend_*.js` + `*.wasm` + concatenated
-  `scriptprocessor_player.js`.
+  `scriptprocessor_player.js` + `wp_worklet.js`.
 - `build/web-public/` — Vite `publicDir`; `prepare-web-assets.mjs` writes the
-  `wasm/` tree here and is cleaned on every run.
+  `wasm/` tree here and is cleaned on every run. The `wp_player.js` proxy
+  is copied here from `web/player/worklet_player/wp_player.js`.
 - `build/dist/` — Vite `outDir` (HTML + assets + `wasm/`).
 
 ## Backend integration (where to edit)
@@ -139,8 +140,8 @@ Multi-page app under `web/` (Vite `root`):
   one without being asked. The `tools/*.mjs` scripts are CLI utilities, not
   tests; they `process.exit(1)` on failure.
 - `tools/prepare-web-assets.mjs` and `tools/verify-build-output.mjs` each
-  hardcode the list of required runtime files. Update **both** when adding a
-  new backend.
+  hardcode the list of required runtime files. Update **both** when adding
+  a new backend or a new worklet pipeline artifact.
 - `sample-files/` is reference data, not a staged web asset. It is scanned
   by `tools/generate-sample-index.mjs` to produce `sample-files/index.json`
   and `sample-files/games.json`; the latter is consumed by
@@ -150,3 +151,25 @@ Multi-page app under `web/` (Vite `root`):
   matched submodule paths at build time. Do not modify submodule contents.
 - `vite.config.mjs` sets `emptyOutDir: !isWatchBuild` so `vite build
   --watch` does not wipe prior outputs between iterations.
+
+## AudioWorklet pipeline
+
+`web/player.html` loads `web/player/worklet_player/feature_flag.js`,
+then either `wasm/scriptprocessor_player.js` (legacy) or
+`wasm/wp_player.js` (the AudioWorklet proxy) based on the `?wp=0` URL
+query and the `localStorage` key `trackify.wpPlayerOverride`. The
+proxy (`web/player/worklet_player/wp_player.js`) preserves the legacy
+`globalThis.ScriptNodePlayer` surface so the rest of the player
+modules do not change.
+
+The worklet module is `wasm/wp_worklet.js`, bundled by CMake from the
+upstream `submodules/webaudio-player/src/impl/*` runtime classes plus
+`web/player/worklet_player/{wp_player_shim.js,wp_worklet_processor.js}`.
+Each backend (`psx`, `snes`, `nez`, `n64`, `vgm`, `xa`, `genh`)
+registers its own `AudioWorkletProcessor`; the proxy creates the
+matching `AudioWorkletNode` per `initialize()` call. MP3 is the one
+exception — it stays on the main thread (the proxy detects
+`Mp3BackendAdapter` and uses `MediaElementAudioSourceNode` directly).
+
+See `docs/audio-worklet-migration.md` for the design and `docs/audio-backends.md`
+§10 for the per-file pipeline contract.
