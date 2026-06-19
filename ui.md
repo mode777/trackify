@@ -1,198 +1,236 @@
-# Trackify UI Architecture (Draft v0.2)
+# UI Message Broker
+
+Reference for the `postMessage`-based inter-frame communication layer
+that all Trackify UI services use. The high-level UI overview (iframe
+topology, app pages, PocketBase wiring) lives in the top-level
+[`README.md`](../README.md); this document covers the message contract,
+the broker API, and the topics currently in use.
 
 ## 1. Scope
 
-Initial iframe microservice topology:
+Trackify's UI is a small iframe microservice topology:
 
-- Main Frame (Shell): controller + message broker
-- Content Frame: catalog, browsing, track selection
-- Player Frame: transport controls and playback state
+- **Shell frame** — controller + message broker. Hosts the navigation
+  chrome and routes every message between services.
+- **Content frame** — content-domain UI (currently `collections.html`
+  and `playlist.html`). Speaks to the shell for catalog data and to
+  the player for playback.
+- **Player frame** — transport controls and the Web Audio pipeline
+  (`player.html`). Owns `ScriptNodePlayer` and the lazy-loaded
+  `backend_*.js` runtimes.
 
-All communication is based on `window.postMessage` and routed through the shell.
-
-## 2. High-Level Architecture
+All inter-frame communication is via `window.postMessage` and routed
+through the shell. There is no direct frame-to-frame messaging.
 
 ```mermaid
 flowchart TD
-    Shell[Main Frame / Shell Controller]
-    Content[Content Frame]
-    Player[Player Frame]
+    Shell[Shell Frame<br/>app.js + broker.js]
+    Content[Content Frame<br/>collections.js / playlist.js]
+    Player[Player Frame<br/>player.js + player/* modules]
 
     Content <-- postMessage --> Shell
-    Player <-- postMessage --> Shell
+    Player  <-- postMessage --> Shell
 
     Shell -. event fanout .-> Content
     Shell -. event fanout .-> Player
 ```
 
-### 2.1 Main Frame (Shell)
+## 2. The shared broker module
 
-- Owns iframe lifecycle and registration.
-- Maintains service registry (`content`, `player`).
-- Validates and routes all messages.
-- Implements pub/sub fanout and request correlation.
+`web/broker.js` exports a single library used in both contexts:
 
-### 2.2 Content Frame
+```js
+import { createShellBroker, createFrameBroker } from './broker.js';
+```
 
-- Publishes content-domain events (example: `content.trackSelected`).
-- Requests data/state from shell or other services via shell broker.
-- Subscribes to player events if needed (example: `player.stateChanged`).
+It exposes one `TrackifyBroker` class with two factory entry points:
 
-### 2.3 Player Frame
+- `createShellBroker({ serviceId, allowedServices, allowedOrigins })`
+  — owns the iframe lifecycle, validates and routes all messages, and
+  implements pub/sub fanout + request correlation.
+- `createFrameBroker({ serviceId, targetOrigin, requestTimeoutMs,
+  allowedOrigins })` — high-level API for content/player frames. Talks
+  to `window.parent` only.
 
-- Publishes playback events (`player.stateChanged`, `playlist.finished`).
-- Handles playback requests (example: `player.playTrack`).
-- Subscribes to content events (example: `content.trackSelected`).
+The broker keeps a service registry (`shell`, `content`, `player`,
+`games`, `playlist`), rejects messages from unknown services, and
+isolates frames from each other.
 
-## 3. Message Contract
+## 3. Message envelope
+
+Every message that crosses the broker is wrapped in the same envelope:
 
 ```ts
 type TrackifyMessage = {
   v: 1;
-  id: string;
-  correlationId?: string;
-  timestamp: string;
+  id: string;                  // unique per message
+  correlationId?: string;      // set on response/error to a request id
+  timestamp: string;           // ISO-8601
   type: 'control' | 'event' | 'request' | 'response' | 'error';
   topic: string;
-  source: 'shell' | 'content' | 'player';
-  target?: 'shell' | 'content' | 'player' | '*';
+  source: 'shell' | 'content' | 'player' | 'games' | 'playlist';
+  target?: 'shell' | 'content' | 'player' | 'games' | 'playlist' | '*';
   payload?: unknown;
   meta?: {
-    timeoutMs?: number;
+    timeoutMs?: number;        // request-level timeout override
   };
 };
 ```
 
-### 3.1 Topic Conventions
+`PROTOCOL_VERSION` is currently `1` (`web/broker.js`). Messages whose
+`v` does not match are dropped by the shell.
 
-- Events:
-  - `playlist.selected`
-  - `content.trackSelected`
-  - `player.stateChanged`
-  - `playlist.finished`
-- Requests:
-  - `content.getTracksForGame`
-  - `player.playTrack`
-  - `player.pause`
-- Responses:
-  - Same `topic` as request or explicit result topic.
-  - Must include `correlationId`.
+## 4. Routing model
 
-### 3.2 `playlist.selected` Event (Shell -> Player)
+1. Frames only talk to `window.parent` (the shell).
+2. The shell validates `origin`, `source`, and the service allowlist.
+3. The shell's behavior by envelope type:
+   - `event` — fan out to subscribers.
+   - `request` — route to the target service, or to a shell-local
+     `handleRequest` handler.
+   - `response` / `error` — resolve or reject the pending request
+     identified by `correlationId`.
+4. No direct frame-to-frame messaging.
 
-The shell emits this event after loading a track-catalog payload.
+Frames register themselves with the shell using the `control/...`
+topic family:
 
-```ts
-type PlaylistSelectedEventPayload = {
-  source: string;               // Example: 'tracks/index.json' or a backend endpoint
-  selectedIndex: number;        // Initial selection, -1 when playlist is empty
-  tracks: Array<{
-    id: string;                 // Shell-assigned stable id, e.g. 'sample-0'
-    title: string;
-    file: string;               // Backend-resolvable track path
-    platform: string;           // e.g. 'psx', 'snes', 'nez', 'n64'
-    game: string;
-    artist: string;
-  }>;
-};
-```
+- `control/service.register` — frame → shell, registers the service id
+  and its `contentWindow`.
+- `control/service.ready` — shell → frame, signals that the shell is
+  ready to route messages.
+- `control/service.subscriptions.update` — frame → shell, updates the
+  set of topics the frame wants to receive.
 
-Event envelope example:
+The shell auto-replies with `control/service.ready` and the frame
+retries `control/service.register` until it has been acknowledged.
 
-```ts
-{
-  type: 'event',
-  topic: 'playlist.selected',
-  source: 'shell',
-  target: 'player',
-  payload: PlaylistSelectedEventPayload,
-}
-```
+## 5. Broker API
 
-## 4. Routing Model
-
-1. Frame -> Shell only (`window.parent.postMessage`).
-2. Shell validates message shape and sender.
-3. Shell behavior:
-   - `event`: fanout to subscribers.
-   - `request`: route to target service or shell-local handler.
-   - `response`/`error`: resolve/reject pending request by `correlationId`.
-4. No direct frame-to-frame communication.
-
-## 5. Lifecycle
-
-1. Frame bootstraps `broker.js` in frame mode.
-2. Frame sends `control/service.register`.
-3. Shell sends `control/service.ready`.
-4. Frame updates subscriptions with `control/service.subscriptions.update`.
-
-## 6. Shared Library: broker.js
-
-Use a single shared module at `web/broker.js` in both shell and frame contexts.
-
-### 6.1 High-Level API
+Both factory entry points return a broker with the same surface:
 
 ```js
-import {
-  createShellBroker,
-  createFrameBroker,
-} from './broker.js';
-
-// Shell
-const shellBroker = createShellBroker({
-  serviceId: 'shell',
-  allowedServices: ['content', 'player'],
-  allowedOrigins: [window.location.origin],
-});
-
-// Frame (example: content)
-const contentBroker = createFrameBroker({
+const broker = createFrameBroker({
   serviceId: 'content',
   targetOrigin: window.location.origin,
   requestTimeoutMs: 4000,
+  allowedOrigins: [window.location.origin],
 });
+
+broker.start();
+broker.destroy();
+
+broker.subscribe(topic, handler);
+broker.publish(topic, payload, options?);   // { target, ... }
+broker.request(topic, payload, options?);   // Promise; resolves on response, rejects on error/timeout
+broker.handleRequest(topic, async ({ payload }) => result);   // shell only
+broker.registerService(serviceId, frameWindow, options?);     // shell only
 ```
 
-Supported operations:
+The `target` option in `publish` / `request` accepts a single service
+id, an array of service ids, or `'*'` for fanout. `subscribe` handlers
+are invoked with `{ payload, meta, message }`.
 
-- `start()` / `destroy()`
-- `subscribe(topic, handler)`
-- `publish(topic, payload, options?)`
-- `request(topic, payload, options?)` -> Promise
-- `handleRequest(topic, handler)`
-- `registerService(serviceId, frameWindow, options?)` (shell only)
+The shell additionally uses `allowedServices` and `allowedOrigins`
+allowlists to drop messages that don't match — these are the security
+baseline of the protocol.
 
-### 6.2 Event Example
+## 6. Topics in use
+
+The shell currently defines the following service allowlist
+(`web/app.js`):
 
 ```js
-// Content frame emits selected track
-contentBroker.publish('content.trackSelected', {
-  trackId: 'oot-001',
-  gameId: 'zelda-oot',
-});
-
-// Player frame reacts
-playerBroker.subscribe('content.trackSelected', async ({ payload }) => {
-  await playerBroker.request('player.playTrack', payload, { target: 'player' });
-});
+allowedServices: ['player', 'playlist', 'games']
 ```
 
-### 6.3 Request/Response Example
+The actual topic traffic, organized by direction:
 
-```js
-// Content asks for tracks
-const result = await contentBroker.request(
-  'content.getTracksForGame',
-  { gameId: 'zelda-oot' },
-  { target: 'shell', timeoutMs: 3000 }
-);
+### Shell-local request handlers
 
-// result = response.payload
+| Topic                  | Requested by | Purpose                                            |
+| ---------------------- | ------------ | -------------------------------------------------- |
+| `shell.queryIndex`     | content      | tracks for a game (or all)                         |
+| `shell.queryGames`     | content      | games list, optionally filtered by id / platform   |
+| `shell.queryFavorites` | content      | current user's favorites playlist                  |
+| `shell.queryUser`      | content      | current PocketBase auth state + user record        |
+
+### Shell → content/player
+
+| Topic                | Type   | Purpose                                            |
+| -------------------- | ------ | -------------------------------------------------- |
+| `playlist.selected`  | event  | tells the player which playlist to load + autoplay  |
+| `player.toggle`      | event  | toggles play/pause (used by media key fallback)    |
+| `player.play`        | event  | play current/selected                              |
+| `player.pause`       | event  | pause playback                                     |
+| `player.next`        | event  | next track                                         |
+| `player.prev`        | event  | previous track                                     |
+| `player.shuffle.toggle` | event | toggle shuffle on/off                           |
+| `player.seek.relative` | event | `{ seconds }` delta seek (signed)                |
+| `player.seek.absolute` | event | `{ seconds }` absolute seek                       |
+
+### Frame → shell
+
+| Topic                       | Type   | Purpose                                            |
+| --------------------------- | ------ | -------------------------------------------------- |
+| `player.ready`              | event  | player frame has finished init                     |
+| `player.trackChanged`       | event  | current track / index changed                      |
+| `player.stateChanged`       | event  | playback state changed                             |
+| `player.mediaSessionSync`   | event  | media-session metadata + position + capabilities   |
+| `playlist.liked`            | event  | user added a track to favorites                    |
+| `playlist.unliked`          | event  | user removed a track from favorites                |
+| `shell.user.login`          | event  | PocketBase auth state became valid                 |
+| `shell.user.logout`         | event  | PocketBase auth state became invalid               |
+
+## 7. `playlist.selected` payload
+
+The `playlist.selected` event is the canonical handoff from the content
+frame (or the shell's favorites flow) to the player frame. Its
+payload shape:
+
+```ts
+type PlaylistSelectedEventPayload = {
+  source: string;               // e.g. 'tracks/index.json' or 'favorites'
+  selectedIndex: number;        // -1 when the playlist is empty
+  tracks: Array<{
+    id: string;                 // shell-assigned stable id, e.g. 'sample-0'
+    title: string;
+    file: string;               // backend-resolvable track URL/path
+    platform: string;           // 'psx' | 'snes' | 'nez' | 'n64' | 'vgm' | 'xa' | 'genh' | 'mp3'
+    game: string;               // display name of the game
+    gameId: string;             // PocketBase record id of the game
+    artist: string;             // joined artist string (multi-artist supported upstream)
+    coverArt: string;           // absolute or relative cover-art URL
+  }>;
+  autoplay?: boolean;           // if true, the player starts immediately
+};
 ```
 
-## 7. Security Baseline
+The `file` field must be resolvable from the player frame's origin.
+For PocketBase-backed tracks, the shell rewrites it to
+`/api/files/games/<gameId>/<filename>` (see
+`ShellCatalogService#resolveFilename` in `web/catalog_service.js`).
 
-- Use explicit `targetOrigin` (avoid `*` outside local dev).
-- Validate `origin`, `source`, and service allowlist in shell.
-- Reject unknown message versions or malformed envelopes.
-- Restrict request topics by service where needed.
+## 8. Adding a new topic
+
+1. Pick a topic name in the existing namespace
+   (`<service>.<verb>` for events, `<service>.<query>` for requests,
+   `control/...` for broker control).
+2. Decide on direction and which side subscribes / handles.
+3. If it crosses the shell, add the new topic to the
+   `allowedServices` allowlist only if you are also introducing a new
+   service id (the broker routes by service, not by topic).
+4. Add the new request handler on the shell with
+   `shellBroker.handleRequest(...)` in `web/app.js#initBroker`, or
+   subscribe to the event on the receiving side.
+5. Document the payload in this file.
+
+## 9. Security baseline
+
+- Use an explicit `targetOrigin` (avoid `'*'` outside local dev).
+- The shell validates `origin`, `source`, and the service allowlist
+  for every inbound message.
+- Unknown protocol versions or malformed envelopes are dropped.
+- Restrict request topics by service where needed (e.g.
+  `shell.queryUser` is only meaningful from authenticated content
+  frames).
