@@ -163,20 +163,6 @@ async function collectGameDirectoryFiles(gameDirectory, excludedRelativePath) {
   }
 }
 
-async function buildGameFiles(gameDirectory, excludedRelativePath) {
-  const relativePaths = await collectGameDirectoryFiles(gameDirectory, excludedRelativePath);
-  const files = [];
-
-  for (const relativePath of relativePaths) {
-    const file = await buildSampleFile(relativePath, { fileName: path.basename(relativePath) });
-    if (file) {
-      files.push(file);
-    }
-  }
-
-  return files;
-}
-
 function valuesDiffer(a, b) {
   return stableStringify(a) !== stableStringify(b);
 }
@@ -272,7 +258,17 @@ function formatPocketBaseError(error) {
 }
 
 async function syncGames(pb, gameItems, existingGames) {
-  const stats = { created: 0, updated: 0, unchanged: 0, failed: 0 };
+  const stats = {
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    coverUploaded: 0,
+    filesUploaded: 0,
+    filesSkipped: 0,
+    filesDeleted: 0,
+    filesFailed: 0,
+  };
   const createdGames = new Map();
   const existingById = new Map();
   const existingByKey = new Map();
@@ -303,17 +299,40 @@ async function syncGames(pb, gameItems, existingGames) {
       coverArt: normalizeString(game.coverArt),
     };
 
-    const key = getGameKey(normalizedGame);
-    const existing =
-      (normalizedGame.sourceId ? existingById.get(normalizedGame.sourceId) : null) ||
-      existingByKey.get(key);
+    const context = `${normalizedGame.platform} / ${normalizedGame.title}`;
+    let createdThisGame = false;
+    let updatedThisGame = false;
+    const fileStatsThisGame = {
+      coverUploaded: 0,
+      filesUploaded: 0,
+      filesSkipped: 0,
+      filesDeleted: 0,
+      filesFailed: 0,
+    };
 
     try {
+      const expectedCoverFileName = normalizedGame.coverArt
+        ? path.basename(normalizedGame.coverArt)
+        : '';
+      const expectedGameFilePaths = await collectGameDirectoryFiles(
+        normalizedGame.directory,
+        normalizedGame.coverArt
+      );
+      const expectedFileNameSet = new Set(
+        expectedGameFilePaths
+          .map((relativePath) => path.basename(relativePath))
+          .filter((fileName) => fileName.length > 0)
+      );
+
+      const existing =
+        (normalizedGame.sourceId ? existingById.get(normalizedGame.sourceId) : null) ||
+        existingByKey.get(getGameKey(normalizedGame));
+
       if (!existing) {
         if (!normalizedGame.sourceId) {
           stats.failed += 1;
           process.stderr.write(
-            `ERROR: failed sync for game ${normalizedGame.platform} / ${normalizedGame.title}: missing required source id\n`
+            `ERROR: failed sync for game ${context}: missing required source id\n`
           );
           continue;
         }
@@ -326,119 +345,206 @@ async function syncGames(pb, gameItems, existingGames) {
           company: normalizedGame.company,
         };
 
-        const createCoverFile = await buildCoverFile(normalizedGame.coverArt);
-        if (createCoverFile) {
-          createBody.coverArt = createCoverFile;
-        }
-
-        const createFiles = await buildGameFiles(normalizedGame.directory, normalizedGame.coverArt);
-        if (createFiles.length > 0) {
-          createBody.files = createFiles;
-        }
-
+        let createdId;
         if (dryRun) {
           createdGames.set(normalizedGame.sourceId, normalizedGame.sourceId);
-          process.stdout.write(`[dry-run] create game ${normalizedGame.platform} / ${normalizedGame.title}\n`);
+          process.stdout.write(`[dry-run] create game ${context}\n`);
           stats.created += 1;
+          createdThisGame = true;
+          createdId = normalizedGame.sourceId;
         } else {
           const created = await pb.collection('games').create(createBody);
-          createdGames.set(normalizedGame.sourceId, created.id);
+          createdId = created.id;
+          createdGames.set(normalizedGame.sourceId, createdId);
           stats.created += 1;
-          process.stdout.write(`Created game ${normalizedGame.platform} / ${normalizedGame.title}\n`);
+          createdThisGame = true;
+          process.stdout.write(`Created game ${context}\n`);
         }
 
-        continue;
-      }
+        if (expectedCoverFileName) {
+          const createCoverFile = await buildCoverFile(normalizedGame.coverArt);
+          if (createCoverFile) {
+            if (dryRun) {
+              process.stdout.write(`[dry-run] upload cover ${expectedCoverFileName} for game ${context}\n`);
+              fileStatsThisGame.coverUploaded += 1;
+            } else {
+              process.stdout.write(`Uploading cover ${expectedCoverFileName} for game ${context}\n`);
+              try {
+                await pb.collection('games').update(createdId, { coverArt: createCoverFile });
+                fileStatsThisGame.coverUploaded += 1;
+              } catch (error) {
+                fileStatsThisGame.filesFailed += 1;
+                process.stderr.write(
+                  `ERROR: failed to upload cover ${expectedCoverFileName} for game ${context}: ${formatPocketBaseError(error)}\n`
+                );
+              }
+            }
+          }
+        }
 
-      const patchBody = {};
-      const patchChanges = [];
+        for (const relativePath of expectedGameFilePaths) {
+          const fileName = path.basename(relativePath);
+          const file = await buildSampleFile(relativePath, { fileName });
+          if (!file) {
+            continue;
+          }
+          if (dryRun) {
+            process.stdout.write(`[dry-run] upload file ${fileName} for game ${context}\n`);
+            fileStatsThisGame.filesUploaded += 1;
+          } else {
+            process.stdout.write(`Uploading file ${fileName} for game ${context}\n`);
+            try {
+              await pb.collection('games').update(createdId, { 'files+': file });
+              fileStatsThisGame.filesUploaded += 1;
+            } catch (error) {
+              fileStatsThisGame.filesFailed += 1;
+              process.stderr.write(
+                `ERROR: failed to upload file ${fileName} for game ${context}: ${formatPocketBaseError(error)}\n`
+              );
+            }
+          }
+        }
+      } else {
+        const existingCoverFileName = getCoverFilename(existing);
+        const existingFileNames = getFileFieldValues(existing, 'files').filter(
+          (fileName) => fileName.length > 0
+        );
+        const existingFileSet = new Set(existingFileNames);
 
-      const existingTitle = normalizeString(existing.title);
-      if (existingTitle !== normalizedGame.title) {
-        patchBody.title = normalizedGame.title;
-        patchChanges.push({ field: 'title', oldValue: existingTitle, newValue: normalizedGame.title });
-      }
+        const patchBody = {};
+        const patchChanges = [];
 
-      const existingYear = normalizeString(existing.year);
-      if (existingYear !== normalizedGame.year && normalizedGame.year.length > 0) {
-        patchBody.year = normalizedGame.year;
-        patchChanges.push({ field: 'year', oldValue: existingYear, newValue: normalizedGame.year });
-      }
+        const existingTitle = normalizeString(existing.title);
+        if (existingTitle !== normalizedGame.title) {
+          patchBody.title = normalizedGame.title;
+          patchChanges.push({ field: 'title', oldValue: existingTitle, newValue: normalizedGame.title });
+        }
 
-      const existingPlatform = normalizeString(existing.platform);
-      if (existingPlatform !== normalizedGame.platform) {
-        patchBody.platform = normalizedGame.platform;
-        patchChanges.push({ field: 'platform', oldValue: existingPlatform, newValue: normalizedGame.platform });
-      }
+        const existingYear = normalizeString(existing.year);
+        if (existingYear !== normalizedGame.year && normalizedGame.year.length > 0) {
+          patchBody.year = normalizedGame.year;
+          patchChanges.push({ field: 'year', oldValue: existingYear, newValue: normalizedGame.year });
+        }
 
-      const existingCompany = normalizeCompany(existing.company);
-      if (normalizedGame.company.length > 0 && valuesDiffer(existingCompany, normalizedGame.company)) {
-        patchBody.company = normalizedGame.company;
-        patchChanges.push({ field: 'company', oldValue: existingCompany, newValue: normalizedGame.company });
-      }
+        const existingPlatform = normalizeString(existing.platform);
+        if (existingPlatform !== normalizedGame.platform) {
+          patchBody.platform = normalizedGame.platform;
+          patchChanges.push({ field: 'platform', oldValue: existingPlatform, newValue: normalizedGame.platform });
+        }
 
-      const existingCoverFileName = getCoverFilename(existing);
-      const expectedCoverFileName = normalizedGame.coverArt
-        ? path.basename(normalizedGame.coverArt)
-        : '';
+        const existingCompany = normalizeCompany(existing.company);
+        if (normalizedGame.company.length > 0 && valuesDiffer(existingCompany, normalizedGame.company)) {
+          patchBody.company = normalizedGame.company;
+          patchChanges.push({ field: 'company', oldValue: existingCompany, newValue: normalizedGame.company });
+        }
 
-      if (expectedCoverFileName && expectedCoverFileName !== existingCoverFileName) {
-        const patchCoverFile = await buildCoverFile(normalizedGame.coverArt);
-        if (patchCoverFile) {
-          patchBody.coverArt = patchCoverFile;
+        if (expectedCoverFileName && expectedCoverFileName !== existingCoverFileName) {
+          const patchCoverFile = await buildCoverFile(normalizedGame.coverArt);
+          if (patchCoverFile) {
+            patchBody.coverArt = patchCoverFile;
+            patchChanges.push({
+              field: 'coverArt',
+              oldValue: existingCoverFileName,
+              newValue: expectedCoverFileName,
+            });
+          }
+        } else if (!expectedCoverFileName && existingCoverFileName) {
+          patchBody.coverArt = '';
           patchChanges.push({
             field: 'coverArt',
             oldValue: existingCoverFileName,
-            newValue: expectedCoverFileName,
+            newValue: '',
           });
+        }
+
+        if (Object.keys(patchBody).length > 0) {
+          const changedFields = Object.keys(patchBody).join(',');
+          const changeDetails = formatChangeDetails(patchChanges);
+
+          if (dryRun) {
+            process.stdout.write(
+              `[dry-run] patch game ${context} fields=${changedFields} changes=${changeDetails}\n`
+            );
+            updatedThisGame = true;
+          } else {
+            await pb.collection('games').update(existing.id, patchBody);
+            updatedThisGame = true;
+            process.stdout.write(
+              `Patched game ${context} fields=${changedFields} changes=${changeDetails}\n`
+            );
+          }
+        }
+
+        for (const relativePath of expectedGameFilePaths) {
+          const fileName = path.basename(relativePath);
+          if (existingFileSet.has(fileName)) {
+            fileStatsThisGame.filesSkipped += 1;
+            continue;
+          }
+          const file = await buildSampleFile(relativePath, { fileName });
+          if (!file) {
+            continue;
+          }
+          if (dryRun) {
+            process.stdout.write(`[dry-run] upload file ${fileName} for game ${context}\n`);
+            fileStatsThisGame.filesUploaded += 1;
+          } else {
+            process.stdout.write(`Uploading file ${fileName} for game ${context}\n`);
+            try {
+              await pb.collection('games').update(existing.id, { 'files+': file });
+              fileStatsThisGame.filesUploaded += 1;
+            } catch (error) {
+              fileStatsThisGame.filesFailed += 1;
+              process.stderr.write(
+                `ERROR: failed to upload file ${fileName} for game ${context}: ${formatPocketBaseError(error)}\n`
+              );
+            }
+          }
+        }
+
+        for (const existingBaseName of existingFileNames) {
+          if (expectedFileNameSet.has(existingBaseName)) {
+            continue;
+          }
+          if (dryRun) {
+            process.stdout.write(`[dry-run] delete file ${existingBaseName} from game ${context}\n`);
+            fileStatsThisGame.filesDeleted += 1;
+          } else {
+            process.stdout.write(`Deleting file ${existingBaseName} from game ${context}\n`);
+            try {
+              await pb.collection('games').update(existing.id, { 'files-': [existingBaseName] });
+              fileStatsThisGame.filesDeleted += 1;
+            } catch (error) {
+              fileStatsThisGame.filesFailed += 1;
+              process.stderr.write(
+                `ERROR: failed to delete file ${existingBaseName} from game ${context}: ${formatPocketBaseError(error)}\n`
+              );
+            }
+          }
         }
       }
 
-      const expectedGameFilePaths = await collectGameDirectoryFiles(
-        normalizedGame.directory,
-        normalizedGame.coverArt
-      );
-      const expectedGameFileNames = expectedGameFilePaths
-        .map((relativePath) => path.basename(relativePath))
-        .filter((fileName) => fileName.length > 0)
-        .sort((a, b) => a.localeCompare(b));
-      const existingGameFileNames = getFileFieldValues(existing, 'files')
-        .filter((fileName) => fileName.length > 0)
-        .sort((a, b) => a.localeCompare(b));
-
-      if (valuesDiffer(existingGameFileNames, expectedGameFileNames)) {
-        patchBody.files = await buildGameFiles(normalizedGame.directory, normalizedGame.coverArt);
-        patchChanges.push({
-          field: 'files',
-          oldValue: existingGameFileNames,
-          newValue: expectedGameFileNames,
-        });
+      if (!createdThisGame) {
+        if (
+          updatedThisGame ||
+          fileStatsThisGame.coverUploaded > 0 ||
+          fileStatsThisGame.filesUploaded > 0 ||
+          fileStatsThisGame.filesDeleted > 0
+        ) {
+          stats.updated += 1;
+        } else {
+          stats.unchanged += 1;
+        }
       }
-
-      if (Object.keys(patchBody).length === 0) {
-        stats.unchanged += 1;
-        continue;
-      }
-
-      const changedFields = Object.keys(patchBody).join(',');
-      const changeDetails = formatChangeDetails(patchChanges);
-
-      if (dryRun) {
-        process.stdout.write(
-          `[dry-run] patch game ${normalizedGame.platform} / ${normalizedGame.title} fields=${changedFields} changes=${changeDetails}\n`
-        );
-        stats.updated += 1;
-      } else {
-        await pb.collection('games').update(existing.id, patchBody);
-        stats.updated += 1;
-        process.stdout.write(
-          `Patched game ${normalizedGame.platform} / ${normalizedGame.title} fields=${changedFields} changes=${changeDetails}\n`
-        );
-      }
+      stats.coverUploaded += fileStatsThisGame.coverUploaded;
+      stats.filesUploaded += fileStatsThisGame.filesUploaded;
+      stats.filesSkipped += fileStatsThisGame.filesSkipped;
+      stats.filesDeleted += fileStatsThisGame.filesDeleted;
+      stats.filesFailed += fileStatsThisGame.filesFailed;
     } catch (error) {
       stats.failed += 1;
       process.stderr.write(
-        `ERROR: failed sync for game ${normalizedGame.platform} / ${normalizedGame.title}: ${formatPocketBaseError(error)}\n`
+        `ERROR: failed sync for game ${context}: ${formatPocketBaseError(error)}\n`
       );
     }
   }
@@ -636,7 +742,7 @@ async function main() {
   process.stdout.write('=== Syncing Games ===\n');
   const { stats: gameStats, createdGames } = await syncGames(pb, gameItems, existingGames);
   process.stdout.write(
-    `Games done. created=${gameStats.created} updated=${gameStats.updated} unchanged=${gameStats.unchanged} failed=${gameStats.failed}\n\n`
+    `Games done. created=${gameStats.created} updated=${gameStats.updated} unchanged=${gameStats.unchanged} failed=${gameStats.failed} covers=${gameStats.coverUploaded} filesUploaded=${gameStats.filesUploaded} filesSkipped=${gameStats.filesSkipped} filesDeleted=${gameStats.filesDeleted} filesFailed=${gameStats.filesFailed}\n\n`
   );
 
   process.stdout.write('=== Syncing Tracks ===\n');

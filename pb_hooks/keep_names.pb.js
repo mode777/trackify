@@ -5,18 +5,26 @@ onBootstrap((e) => {
     console.log("[HOOKS] keep-names hook loaded")
 })
 
+function preserveOriginalName(file) {
+    if (!file) {
+        return;
+    }
+    if (!file.originalName || file.name === file.originalName) {
+        return;
+    }
+    file.name = file.originalName;
+}
+
 onRecordCreate((e) => {
     try {
         const files = e.record.get("files");
         if (files && Array.isArray(files)) {
-            files.forEach((file) => {
-                file.name = file.originalName;
-            });
+            files.forEach(preserveOriginalName);
         }
 
         const coverArt = e.record.get("coverArt");
-        if (coverArt && coverArt.originalName) {
-            coverArt.name = coverArt.originalName;
+        if (coverArt) {
+            preserveOriginalName(coverArt);
         }
     } catch (err) {
         console.error("[HOOKS] keep-names onRecordCreate error:", err)
@@ -29,14 +37,12 @@ onRecordUpdate((e) => {
     try {
         const files = e.record.get("files");
         if (files && Array.isArray(files)) {
-            files.forEach((file) => {
-                file.name = file.originalName;
-            });
+            files.forEach(preserveOriginalName);
         }
 
         const coverArt = e.record.get("coverArt");
-        if (coverArt && coverArt.originalName) {
-            coverArt.name = coverArt.originalName;
+        if (coverArt) {
+            preserveOriginalName(coverArt);
         }
     } catch (err) {
         console.error("[HOOKS] keep-names onRecordUpdate error:", err)
