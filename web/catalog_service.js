@@ -167,7 +167,7 @@ export class ShellCatalogService {
                 artist: this.normalizeArtist(entry.artist),
                 file: this.resolveFilename(entry, 'filename'),
                 gameId: typeof entry.gameId === 'string' ? entry.gameId.trim() : '',
-                coverArt: this.resolveFileField(entry, 'coverArt'),
+                coverArt: this.resolveFilename(entry, 'coverArt'),
             }));
     }
 
