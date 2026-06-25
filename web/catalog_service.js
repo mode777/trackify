@@ -7,6 +7,7 @@ const GAMES_COLLECTION = 'games';
 const PLAYLISTS_COLLECTION = 'playlists';
 const PLAYLIST_TRACKS_VIEW_COLLECTION = 'playlist_tracks_view';
 const PLAYLIST_TRACKS_COLLECTION = 'playlist_tracks';
+const ARTISTS_VIEW_COLLECTION = 'artists_view';
 
 const EXTENSIONS = {
     psx: ['psf', 'minipsf', 'psf2', 'minipsf2', 'psflib'],
@@ -33,8 +34,14 @@ export class ShellCatalogService {
         this.favoritesTracksCache = null;
         this.favoritesTracksCacheUser = null;
 
+        this.artists = [];
+        this.artistsLoadError = '';
+        this.artistsLoadPromise = null;
+
         this.indexLoadErrorMessage = 'Error loading tracks collection (see console)';
         this.gamesLoadErrorMessage = 'Error loading games collection (see console)';
+        this.artistsLoadErrorMessage = 'Error loading artists collection (see console)';
+        this.playlistsLoadErrorMessage = 'Error loading playlists collection (see console)';
     }
 
     async queryFavorites() {
@@ -116,6 +123,28 @@ export class ShellCatalogService {
         return this.makeGamesPayload(filteredGames, this.gamesLoadError);
     }
 
+    async queryArtists(filters) {
+        await this.ensureArtistsLoaded();
+        const filteredArtists = this.filterArtists(this.artists, filters || {});
+        return this.makeArtistsPayload(filteredArtists, this.artistsLoadError);
+    }
+
+    async queryPlaylists(filters) {
+        const typeFilter = (typeof filters.type === 'string' && filters.type.trim())
+            ? filters.type.trim().toLowerCase()
+            : 'public';
+
+        try {
+            const filter = `type="${typeFilter}"`;
+            const records = await this.pb.collection(PLAYLISTS_COLLECTION).getFullList({ filter });
+            const playlists = this.parsePlaylistsManifest(records);
+            return this.makePlaylistsPayload(playlists);
+        } catch (error) {
+            console.error('Failed to load playlists', error);
+            return this.makePlaylistsPayload([], this.playlistsLoadErrorMessage);
+        }
+    }
+
     preload() {
         this.ensureGamesLoaded();
     }
@@ -139,6 +168,25 @@ export class ShellCatalogService {
         return this.gamesLoadPromise;
     }
 
+    async ensureArtistsLoaded() {
+        if (this.artistsLoadPromise) {
+            return this.artistsLoadPromise;
+        }
+
+        this.artistsLoadPromise = this.loadArtists()
+            .then((loadedArtists) => {
+                this.artists = loadedArtists;
+                this.artistsLoadError = '';
+            })
+            .catch((error) => {
+                console.error('Failed to load artists', error);
+                this.artists = [];
+                this.artistsLoadError = this.artistsLoadErrorMessage;
+            });
+
+        return this.artistsLoadPromise;
+    }
+
     async loadTracks() {
         const records = await this.pb.collection(TRACKS_COLLECTION).getList(1, 100, { sort: 'title' });
         return this.parseTracksManifest(records.items);
@@ -152,6 +200,11 @@ export class ShellCatalogService {
     async loadGames() {
         const records = await this.pb.collection(GAMES_COLLECTION).getFullList();
         return this.parseGamesManifest(records);
+    }
+
+    async loadArtists() {
+        const records = await this.pb.collection(ARTISTS_VIEW_COLLECTION).getFullList();
+        return this.parseArtistsManifest(records);
     }
 
     parseTracksManifest(data) {
@@ -189,6 +242,18 @@ export class ShellCatalogService {
             }));
     }
 
+    parseArtistsManifest(data) {
+        const entries = Array.isArray(data) ? data : null;
+        if (!entries) throw new Error('Invalid artists collection format');
+
+        return entries
+            .filter((entry) => entry && typeof entry.title === 'string')
+            .map((entry) => ({
+                id: typeof entry.id === 'string' ? entry.id : '',
+                name: entry.title.trim(),
+            }));
+    }
+
     filterGames(entries, filters) {
         const gameFilter = this.normalizeFilterValue(filters && filters.game);
         const platformFilter = this.normalizeFilterValue(filters && filters.platform);
@@ -207,6 +272,19 @@ export class ShellCatalogService {
         });
     }
 
+    filterArtists(entries, filters) {
+        const artistFilter = this.normalizeFilterValue(filters && filters.artist);
+
+        if (!artistFilter) {
+            return entries;
+        }
+
+        return entries.filter((entry) => {
+            const nameValue = this.normalizeFilterValue(entry.name);
+            return nameValue.includes(artistFilter);
+        });
+    }
+
     makeIndexPayload(tracks, errorMessage = '') {
         return {
             selectedIndex: tracks.length > 0 ? 0 : -1,
@@ -221,6 +299,31 @@ export class ShellCatalogService {
             games: entries,
             error: errorMessage,
         };
+    }
+
+    makeArtistsPayload(entries, errorMessage = '') {
+        return {
+            artists: entries,
+            error: errorMessage,
+        };
+    }
+
+    makePlaylistsPayload(entries, errorMessage = '') {
+        return {
+            playlists: entries,
+            error: errorMessage,
+        };
+    }
+
+    parsePlaylistsManifest(data) {
+        const entries = Array.isArray(data) ? data : null;
+        if (!entries) throw new Error('Invalid playlists collection format');
+
+        return entries.map((entry) => ({
+            id: typeof entry.id === 'string' ? entry.id : '',
+            title: typeof entry.title === 'string' ? entry.title.trim() : '',
+            type: typeof entry.type === 'string' ? entry.type : '',
+        }));
     }
 
     normalizeFilterValue(value) {

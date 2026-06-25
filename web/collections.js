@@ -2,17 +2,25 @@
  * Trackify collections frame app.
  *
  * Responsibilities:
- * - Load games metadata from the shell service.
- * - Render the games grid in the content area.
- * - Open filtered playlist view when a game is selected.
+ * - Render browsable grids for games, playlists, platforms, and artists.
+ * - Switch content type via `?type=<type>` hash parameter.
+ * - Delegate play/browse actions according to type.
+ *
+ * Data fetching is not implemented yet — stores start empty.
  */
-'use strict';
 
 import { createFrameBroker } from './broker.js';
 
+const VALID_COLLECTION_TYPES = new Set(['games', 'playlists', 'platforms', 'artists']);
+const DEFAULT_TYPE = 'games';
+
 const els = {
     grid: document.getElementById('collectionsGrid'),
+    gridSection: document.getElementById('collectionsGridSection'),
     status: document.getElementById('collectionsStatus'),
+    headerSection: document.querySelector('.collections-header'),
+    eyebrow: document.querySelector('.eyebrow'),
+    heading: document.querySelector('.collections-header h2'),
 };
 
 const broker = createFrameBroker({
@@ -22,14 +30,21 @@ const broker = createFrameBroker({
     allowedOrigins: [window.location.origin],
 });
 
-let games = [];
+const stores = {
+    games: [],
+    playlists: [],
+    platforms: [],
+    artists: [],
+};
+
+let activeType = DEFAULT_TYPE;
 
 function setStatus(message) {
     if (!els.status) return;
     els.status.textContent = message;
 }
 
-function filtersFromFragment() {
+function paramsFromFragment() {
     const hash = window.location.hash || '';
     const fragment = hash.startsWith('#') ? hash.slice(1) : hash;
 
@@ -43,20 +58,12 @@ function filtersFromFragment() {
 
     if (!queryString) return {};
 
-    const params = new URLSearchParams(queryString);
-    const game = params.get('game');
-    const platform = params.get('platform');
-    const filters = {};
+    return Object.fromEntries(new URLSearchParams(queryString).entries());
+}
 
-    if (typeof game === 'string' && game.trim()) {
-        filters.game = game.trim();
-    }
-
-    if (typeof platform === 'string' && platform.trim()) {
-        filters.platform = platform.trim();
-    }
-
-    return filters;
+function resolveType(params) {
+    const raw = typeof params.type === 'string' ? params.type.trim().toLowerCase() : '';
+    return VALID_COLLECTION_TYPES.has(raw) ? raw : DEFAULT_TYPE;
 }
 
 function safeCoverArtUrl(coverArt) {
@@ -69,17 +76,174 @@ function safeCoverArtUrl(coverArt) {
     }
 }
 
-function buildMetaLine(game) {
-    const company = Array.isArray(game.company)
-        ? game.company.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean).join(', ')
-        : '';
+function normalizeItem(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    switch (activeType) {
 
-    const year = typeof game.year === 'string' ? game.year.trim() : '';
-    return { company, year };
+    case 'games':
+        return {
+            id: typeof raw.id === 'string' ? raw.id : '',
+            title: typeof raw.title === 'string' ? raw.title.trim() : '',
+            company: Array.isArray(raw.company) ? raw.company : [],
+            year: typeof raw.year === 'string' ? raw.year : '',
+            coverArt: typeof raw.coverArt === 'string' ? raw.coverArt : '',
+        };
+
+    case 'playlists':
+        return {
+            id: typeof raw.id === 'string' ? raw.id : '',
+            title: typeof raw.title === 'string' ? raw.title.trim() : '',
+            description: typeof raw.description === 'string' ? raw.description : '',
+            trackCount: typeof raw.trackCount === 'number' ? raw.trackCount : 0,
+            coverArt: typeof raw.coverArt === 'string' ? raw.coverArt : '',
+        };
+
+    case 'platforms':
+        return {
+            id: typeof raw.id === 'string' ? raw.id : '',
+            name: typeof raw.name === 'string' ? raw.name.trim() : '',
+            gameCount: typeof raw.gameCount === 'number' ? raw.gameCount : 0,
+            logoUrl: typeof raw.logoUrl === 'string' ? raw.logoUrl : '',
+        };
+
+    case 'artists':
+        return {
+            id: typeof raw.id === 'string' ? raw.id : '',
+            name: typeof raw.name === 'string' ? raw.name.trim() : '',
+            trackCount: typeof raw.trackCount === 'number' ? raw.trackCount : 0,
+            photoUrl: typeof raw.photoUrl === 'string' ? raw.photoUrl : '',
+        };
+
+    default:
+        return null;
+    }
 }
 
-function openPlaylist(gameTitle) {
-    const target = '/playlist.html#?game=' + encodeURIComponent(gameTitle);
+function buildMetaLine(item) {
+    switch (activeType) {
+
+    case 'games': {
+        const company = Array.isArray(item.company)
+            ? item.company.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean).join(', ')
+            : '';
+
+        const year = typeof item.year === 'string' ? item.year.trim() : '';
+        return { company, year };
+    }
+
+    case 'playlists': {
+        const count = typeof item.trackCount === 'number' && item.trackCount > 0
+            ? item.trackCount + ' track' + (item.trackCount !== 1 ? 's' : '')
+            : '';
+        return { line: count };
+    }
+
+    case 'platforms': {
+        const count = typeof item.gameCount === 'number' && item.gameCount > 0
+            ? item.gameCount + ' game' + (item.gameCount !== 1 ? 's' : '')
+            : '';
+        return { line: count };
+    }
+
+    case 'artists': {
+        const count = typeof item.trackCount === 'number' && item.trackCount > 0
+            ? item.trackCount + ' track' + (item.trackCount !== 1 ? 's' : '')
+            : '';
+        return { line: count };
+    }
+
+    default:
+        return {};
+    }
+}
+
+function metaText(meta) {
+    switch (activeType) {
+
+    case 'games': {
+        const companyText = meta.company || 'Unknown company';
+        const yearText = meta.year || 'Unknown year';
+        return meta.company && meta.year
+            ? companyText + ' \u00b7 ' + yearText
+            : companyText + ' ' + yearText;
+    }
+
+    default:
+        return meta.line || '';
+    }
+}
+
+function itemTitle(item) {
+    switch (activeType) {
+    case 'platforms':
+        return item.name || '';
+    case 'artists':
+        return item.name || '';
+    default:
+        return item.title || '';
+    }
+}
+
+function itemCoverUrl(item) {
+    switch (activeType) {
+    case 'games':
+    case 'playlists':
+        return safeCoverArtUrl(item.coverArt);
+    case 'platforms':
+        return safeCoverArtUrl(item.logoUrl);
+    case 'artists':
+        return safeCoverArtUrl(item.photoUrl);
+    default:
+        return '';
+    }
+}
+
+function itemAriaLabel(item) {
+    const title = itemTitle(item);
+    switch (activeType) {
+    case 'games':
+        return 'Open playlist for ' + title;
+    case 'playlists':
+        return 'Play playlist ' + title;
+    case 'platforms':
+        return 'Browse ' + title + ' games';
+    case 'artists':
+        return 'Browse ' + title + ' tracks';
+    default:
+        return title;
+    }
+}
+
+function handlePrimaryAction(item) {
+    switch (activeType) {
+    case 'games':
+        return openPlaylist(item.id);
+    case 'playlists':
+        return playPlaylist(item);
+    case 'platforms':
+        return browsePlatformGames(item);
+    case 'artists':
+        return browseArtistTracks(item);
+    }
+}
+
+function handlePlayAction(event, item) {
+    event.stopPropagation();
+
+    switch (activeType) {
+    case 'games':
+        return playGame(item);
+    case 'playlists':
+        return playPlaylist(item);
+    default:
+        return;
+    }
+}
+
+/* ── Games-specific actions ── */
+
+function openPlaylist(gameId) {
+    const target = '/playlist.html#?game=' + encodeURIComponent(gameId);
     window.location.assign(target);
 }
 
@@ -87,9 +251,9 @@ async function playGame(game) {
     if (!game || typeof game.id !== 'string' || !game.id.trim()) return;
 
     const gameId = game.id.trim();
-    const gameTitle = typeof game.title === 'string' ? game.title.trim() : '';
+    const gameName = itemTitle(game);
 
-    setStatus('Loading tracks for ' + gameTitle + '...');
+    setStatus('Loading tracks for ' + gameName + '...');
 
     try {
         const payload = await broker.request('shell.queryIndex', { game: gameId }, {
@@ -109,7 +273,7 @@ async function playGame(game) {
             : [];
 
         if (!tracks.length) {
-            setStatus('No tracks found for ' + gameTitle);
+            setStatus('No tracks found for ' + gameName);
             return;
         }
 
@@ -123,141 +287,221 @@ async function playGame(game) {
             autoplay: true,
         }, { target: 'player' });
 
-        setStatus('Now playing ' + gameTitle);
+        setStatus('Now playing ' + gameName);
     } catch (error) {
         console.error('Failed to query shell index for game playback', error);
         setStatus('Error loading sample-files/index.json (see console)');
     }
 }
 
-function renderGames() {
+/* ── Stubbed type actions (no data fetching yet) ── */
+
+function playPlaylist(item) {
+    const name = itemTitle(item);
+    setStatus('Playlist playback not yet implemented for ' + name);
+}
+
+function browsePlatformGames(item) {
+    const name = itemTitle(item);
+    window.location.assign('/collections.html#?type=games&platform=' + encodeURIComponent(name));
+}
+
+function browseArtistTracks(item) {
+    const name = itemTitle(item);
+    window.location.assign('/playlist.html#?artist=' + encodeURIComponent(name));
+}
+
+/* ── Header update ── */
+
+const HEADER_BY_TYPE = {
+    games: { eyebrow: 'Browse By Game', heading: 'Games Library' },
+    playlists: { eyebrow: 'Browse By Playlist', heading: 'Playlists' },
+    platforms: { eyebrow: 'Browse By Platform', heading: 'Platforms' },
+    artists: { eyebrow: 'Browse By Artist', heading: 'Artists' },
+};
+
+function updateHeader() {
+    const labels = HEADER_BY_TYPE[activeType] || HEADER_BY_TYPE[DEFAULT_TYPE];
+
+    if (els.eyebrow) {
+        els.eyebrow.textContent = labels.eyebrow;
+    }
+    if (els.heading) {
+        els.heading.textContent = labels.heading;
+    }
+    if (els.headerSection) {
+        els.headerSection.setAttribute('aria-label', labels.eyebrow + ' \u2014 ' + labels.heading);
+    }
+    if (els.gridSection) {
+        els.gridSection.setAttribute('aria-label', labels.eyebrow + ' grid');
+    }
+}
+
+/* ── Rendering ── */
+
+function renderCard(item) {
+    const li = document.createElement('li');
+    li.className = 'collection-card';
+
+    const card = document.createElement('div');
+    card.className = 'collection-link';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', itemAriaLabel(item));
+
+    const cover = document.createElement('div');
+    cover.className = 'collection-cover';
+    const coverUrl = itemCoverUrl(item);
+    if (coverUrl) {
+        cover.classList.add('has-art');
+        cover.style.setProperty('--cover-url', 'url("' + coverUrl.replace(/"/g, '\\"') + '")');
+    }
+
+    const playButton = document.createElement('button');
+    playButton.type = 'button';
+    playButton.className = 'collection-play-button material-symbols-outlined filled';
+    playButton.textContent = activeType === 'playlists' ? 'play_arrow' : 'play_arrow';
+    playButton.setAttribute('aria-label', 'Play ' + itemTitle(item));
+    cover.appendChild(playButton);
+
+    const body = document.createElement('div');
+    body.className = 'collection-body';
+
+    const titleEl = document.createElement('h3');
+    titleEl.className = 'collection-title';
+    titleEl.textContent = itemTitle(item);
+
+    const meta = buildMetaLine(item);
+    const metaRow = document.createElement('p');
+    metaRow.className = 'collection-meta';
+
+    metaRow.textContent = metaText(meta);
+
+    body.append(titleEl, metaRow);
+    card.append(cover, body);
+    li.appendChild(card);
+
+    card.addEventListener('click', () => {
+        handlePrimaryAction(item);
+    });
+
+    card.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        handlePrimaryAction(item);
+    });
+
+    if (activeType === 'games' || activeType === 'playlists') {
+        playButton.addEventListener('click', (event) => {
+            handlePlayAction(event, item);
+        });
+    }
+
+    return li;
+}
+
+function renderItems() {
     if (!els.grid) return;
 
     els.grid.innerHTML = '';
 
-    games.forEach((game) => {
-        const item = document.createElement('li');
-        item.className = 'collection-card';
-
-        const card = document.createElement('div');
-        card.className = 'collection-link';
-        card.setAttribute('role', 'button');
-        card.setAttribute('tabindex', '0');
-        card.setAttribute('aria-label', 'Open playlist for ' + game.title);
-
-        const cover = document.createElement('div');
-        cover.className = 'collection-cover';
-        const coverUrl = safeCoverArtUrl(game.coverArt);
-        if (coverUrl) {
-            cover.classList.add('has-art');
-            cover.style.setProperty('--cover-url', 'url("' + coverUrl.replace(/"/g, '\\"') + '")');
-        }
-
-        const playButton = document.createElement('button');
-        playButton.type = 'button';
-        playButton.className = 'collection-play-button material-symbols-outlined filled';
-        playButton.textContent = 'play_arrow';
-        playButton.setAttribute('aria-label', 'Play ' + game.title);
-        cover.appendChild(playButton);
-
-        const body = document.createElement('div');
-        body.className = 'collection-body';
-
-        const title = document.createElement('h3');
-        title.className = 'collection-title';
-        title.textContent = game.title;
-
-        const meta = buildMetaLine(game);
-        const metaRow = document.createElement('p');
-        metaRow.className = 'collection-meta';
-
-        const companyText = meta.company || 'Unknown company';
-        const yearText = meta.year || 'Unknown year';
-        const inlineMeta = meta.company && meta.year
-            ? companyText + ' \u00b7 ' + yearText
-            : companyText + ' ' + yearText;
-        metaRow.textContent = inlineMeta;
-
-        body.append(title, metaRow);
-        card.append(cover, body);
-        item.appendChild(card);
-        els.grid.appendChild(item);
-
-        card.addEventListener('click', () => {
-            openPlaylist(game.id);
-        });
-
-        card.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            openPlaylist(game.id);
-        });
-
-        playButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            playGame(game);
-        });
-    });
+    const items = stores[activeType] || [];
+    for (const item of items) {
+        els.grid.appendChild(renderCard(item));
+    }
 }
 
-function handleGamesPayload(payload) {
+/* ── Data handling ── */
+
+function loadItems(payload) {
     if (!payload) return;
 
     if (typeof payload.error === 'string' && payload.error) {
-        games = [];
-        renderGames();
+        stores[activeType] = [];
+        renderItems();
         setStatus(payload.error);
         return;
     }
 
-    if (!Array.isArray(payload.games)) {
-        games = [];
-        renderGames();
-        setStatus('No games payload returned');
+    const keyMap = { games: 'games', playlists: 'playlists', platforms: 'platforms', artists: 'artists' };
+    const key = keyMap[activeType] || 'games';
+    const raw = Array.isArray(payload[key]) ? payload[key] : [];
+    stores[activeType] = raw
+        .map((entry) => normalizeItem(entry))
+        .filter((item) => item && itemTitle(item));
+
+    renderItems();
+
+    if (!stores[activeType].length) {
+        setStatus('No ' + activeType + ' found');
         return;
     }
 
-    games = payload.games
-        .filter((entry) => entry && typeof entry.title === 'string')
-        .map((entry) => ({
-            ...entry,
-            title: entry.title.trim(),
-            company: Array.isArray(entry.company) ? entry.company : [],
-            year: typeof entry.year === 'string' ? entry.year : '',
-            coverArt: typeof entry.coverArt === 'string' ? entry.coverArt : '',
-        }));
-
-    renderGames();
-
-    if (!games.length) {
-        setStatus('No games found');
-        return;
-    }
-
-    setStatus('Loaded ' + games.length + ' games');
+    setStatus('Loaded ' + stores[activeType].length + ' ' + activeType);
 }
 
-async function queryGames() {
+/* ── Query dispatch ── */
+
+function topicForType() {
+    switch (activeType) {
+    case 'games':
+        return 'shell.queryGames';
+    case 'playlists':
+        return 'shell.queryPlaylists';
+    case 'platforms':
+        return 'shell.queryPlatforms';
+    case 'artists':
+        return 'shell.queryArtists';
+    default:
+        return null;
+    }
+}
+
+async function fetchItems() {
+    const topic = topicForType();
+    if (!topic) {
+        setStatus('Unknown collection type: ' + activeType);
+        return;
+    }
+
+    const { type: _routeType, ...filters } = paramsFromFragment();
+
     try {
-        const payload = await broker.request('shell.queryGames', filtersFromFragment(), {
+        const payload = await broker.request(topic, filters, {
             target: 'shell',
             timeoutMs: 15000,
         });
-        handleGamesPayload(payload);
+        loadItems(payload);
     } catch (error) {
-        console.error('Failed to query shell games index', error);
-        games = [];
-        renderGames();
-        setStatus('Error loading sample-files/games.json (see console)');
+        console.error('Failed to fetch ' + activeType, error);
+        stores[activeType] = [];
+        renderItems();
+        setStatus('Error loading ' + activeType + ' (see console)');
     }
+}
+
+/* ── Init ── */
+
+function applyRoute() {
+    const params = paramsFromFragment();
+    const nextType = resolveType(params);
+
+    if (nextType !== activeType) {
+        activeType = nextType;
+        updateHeader();
+        renderItems();
+    }
+
+    fetchItems();
 }
 
 function init() {
     broker.start();
+    updateHeader();
     setStatus('Waiting for library...');
 
-    window.addEventListener('hashchange', queryGames);
-    queryGames();
+    window.addEventListener('hashchange', applyRoute);
+    applyRoute();
 }
 
 if (document.readyState === 'loading') {

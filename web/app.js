@@ -431,6 +431,12 @@ function initBroker() {
     shellBroker.handleRequest('shell.queryGames', async ({ payload }) => {
         return catalogService.queryGames(payload || {});
     });
+    shellBroker.handleRequest('shell.queryArtists', async ({ payload }) => {
+        return catalogService.queryArtists(payload || {});
+    });
+    shellBroker.handleRequest('shell.queryPlaylists', async ({ payload }) => {
+        return catalogService.queryPlaylists(payload || {});
+    });
     shellBroker.handleRequest('shell.queryUser', async () => {
         return makeAuthUserPayload();
     });
