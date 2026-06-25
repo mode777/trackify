@@ -16,6 +16,7 @@
     "samples:upload-index": "node tools/upload-index.mjs",
     "pocketbase:download": "node tools/download-pocketbase.mjs",
     "pocketbase:serve": "node tools/serve-pocketbase.mjs",
+    "khinsider:download": "node tools/download-khinsider-album.mjs",
     "dev": "npm run wasm && npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "dev-js": "npm run assets:prepare && vite --host 127.0.0.1 --port 8137",
     "build": "npm run wasm && npm run assets:prepare && vite build",
@@ -25,6 +26,7 @@
     "verify:dist": "node tools/verify-build-output.mjs"
   },
   "devDependencies": {
+    "cheerio": "^1.0.0",
     "vite": "^5.4.0"
   },
   "dependencies": {
