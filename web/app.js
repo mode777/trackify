@@ -437,6 +437,9 @@ function initBroker() {
     shellBroker.handleRequest('shell.queryPlaylists', async ({ payload }) => {
         return catalogService.queryPlaylists(payload || {});
     });
+    shellBroker.handleRequest('shell.createPlaylist', async ({ payload }) => {
+        return catalogService.createPlaylist(payload && payload.title);
+    });
     shellBroker.handleRequest('shell.queryUser', async () => {
         return makeAuthUserPayload();
     });
@@ -471,10 +474,24 @@ function initBroker() {
     shellBroker.start();
 }
 
+function bindCreatePlaylistButton() {
+    const button = document.querySelector('.create-btn');
+    if (!button) return;
+
+    button.addEventListener('click', async () => {
+        try {
+            await catalogService.createPlaylist();
+        } catch (error) {
+            console.error('Failed to create playlist', error);
+        }
+    });
+}
+
 function init() {
     catalogService.preload();
     bindAuthUi();
     bindHistoryButtons();
+    bindCreatePlaylistButton();
     bindShellMediaSessionHandlers();
     bindMediaKeyFallback();
     initBroker();

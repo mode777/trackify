@@ -21,6 +21,7 @@ const els = {
     headerSection: document.querySelector('.collections-header'),
     eyebrow: document.querySelector('.eyebrow'),
     heading: document.querySelector('.collections-header h2'),
+    hero: document.getElementById('collectionsHero'),
 };
 
 const broker = createFrameBroker({
@@ -38,6 +39,7 @@ const stores = {
 };
 
 let activeType = DEFAULT_TYPE;
+let activePlaylistType = '';
 
 function setStatus(message) {
     if (!els.status) return;
@@ -64,6 +66,15 @@ function paramsFromFragment() {
 function resolveType(params) {
     const raw = typeof params.type === 'string' ? params.type.trim().toLowerCase() : '';
     return VALID_COLLECTION_TYPES.has(raw) ? raw : DEFAULT_TYPE;
+}
+
+function resolvePlaylistType(params) {
+    const raw = typeof params.playlistType === 'string' ? params.playlistType.trim().toLowerCase() : '';
+    return raw || '';
+}
+
+function isMyLibraryView() {
+    return activeType === 'playlists' && activePlaylistType === 'private';
 }
 
 function safeCoverArtUrl(coverArt) {
@@ -321,7 +332,9 @@ const HEADER_BY_TYPE = {
 };
 
 function updateHeader() {
-    const labels = HEADER_BY_TYPE[activeType] || HEADER_BY_TYPE[DEFAULT_TYPE];
+    const labels = isMyLibraryView()
+        ? { eyebrow: 'Your Library', heading: 'My Library' }
+        : (HEADER_BY_TYPE[activeType] || HEADER_BY_TYPE[DEFAULT_TYPE]);
 
     if (els.eyebrow) {
         els.eyebrow.textContent = labels.eyebrow;
@@ -335,6 +348,11 @@ function updateHeader() {
     if (els.gridSection) {
         els.gridSection.setAttribute('aria-label', labels.eyebrow + ' grid');
     }
+}
+
+function updateHero() {
+    if (!els.hero) return;
+    els.hero.hidden = !isMyLibraryView();
 }
 
 /* ── Rendering ── */
@@ -465,6 +483,10 @@ async function fetchItems() {
     }
 
     const { type: _routeType, ...filters } = paramsFromFragment();
+    if (activeType === 'playlists' && typeof filters.playlistType === 'string' && filters.playlistType.trim()) {
+        filters.type = filters.playlistType.trim().toLowerCase();
+        delete filters.playlistType;
+    }
 
     try {
         const payload = await broker.request(topic, filters, {
@@ -485,10 +507,13 @@ async function fetchItems() {
 function applyRoute() {
     const params = paramsFromFragment();
     const nextType = resolveType(params);
+    const nextPlaylistType = resolvePlaylistType(params);
 
-    if (nextType !== activeType) {
+    if (nextType !== activeType || nextPlaylistType !== activePlaylistType) {
         activeType = nextType;
+        activePlaylistType = nextPlaylistType;
         updateHeader();
+        updateHero();
         renderItems();
     }
 
@@ -498,6 +523,7 @@ function applyRoute() {
 function init() {
     broker.start();
     updateHeader();
+    updateHero();
     setStatus('Waiting for library...');
 
     window.addEventListener('hashchange', applyRoute);

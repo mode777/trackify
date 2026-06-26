@@ -83,6 +83,22 @@ export class ShellCatalogService {
         this.favoritesTracksCache = this.favoritesTracksCache.filter((track) => track.id !== trackId);
     }
 
+    async createPlaylist(title) {
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+        const userId = this.pb.authStore.record.id;
+        const resolvedTitle = (typeof title === 'string' && title.trim())
+            ? title.trim()
+            : 'New Playlist';
+        const record = await this.pb.collection(PLAYLISTS_COLLECTION).create({
+            title: resolvedTitle,
+            type: 'private',
+            user: userId,
+        });
+        return this.parsePlaylistsManifest([record])[0];
+    }
+
     async getOrCreateFavoritesPlaylist() {
         if (!this.pb.authStore.isValid) {
             throw new Error('User is not authenticated');
