@@ -42,6 +42,8 @@ export class ShellCatalogService {
         this.gamesLoadErrorMessage = 'Error loading games collection (see console)';
         this.artistsLoadErrorMessage = 'Error loading artists collection (see console)';
         this.playlistsLoadErrorMessage = 'Error loading playlists collection (see console)';
+        this.playlistLoadErrorMessage = 'Error loading playlist (see console)';
+        this.playlistNotFoundMessage = 'Playlist not found';
     }
 
     async queryFavorites() {
@@ -158,6 +160,29 @@ export class ShellCatalogService {
         } catch (error) {
             console.error('Failed to load playlists', error);
             return this.makePlaylistsPayload([], this.playlistsLoadErrorMessage);
+        }
+    }
+
+    async queryPlaylist(id) {
+        if (typeof id !== 'string' || !id.trim()) {
+            return this.makePlaylistPayload([], null, 'Missing playlist id');
+        }
+        const playlistId = id.trim();
+
+        try {
+            const record = await this.pb.collection(PLAYLISTS_COLLECTION).getOne(playlistId);
+            const playlist = this.parsePlaylistsManifest([record])[0];
+            if (!playlist || !playlist.id) {
+                return this.makePlaylistPayload([], null, this.playlistNotFoundMessage);
+            }
+            const response = await this.pb.collection(PLAYLIST_TRACKS_VIEW_COLLECTION).getList(1, 1000, { filter: `playlistId="${playlistId}"` });
+            const tracks = this.parseTracksManifest(response.items);
+            return this.makePlaylistPayload(tracks, playlist, '');
+        } catch (error) {
+            console.error('Failed to load playlist', playlistId, error);
+            const isNotFound = error && (error.status === 404 || error.code === 404);
+            const message = isNotFound ? this.playlistNotFoundMessage : this.playlistLoadErrorMessage;
+            return this.makePlaylistPayload([], null, message);
         }
     }
 
@@ -327,6 +352,14 @@ export class ShellCatalogService {
     makePlaylistsPayload(entries, errorMessage = '') {
         return {
             playlists: entries,
+            error: errorMessage,
+        };
+    }
+
+    makePlaylistPayload(tracks, playlist, errorMessage = '') {
+        return {
+            tracks: Array.isArray(tracks) ? tracks : [],
+            playlist: playlist && typeof playlist === 'object' ? playlist : null,
             error: errorMessage,
         };
     }

@@ -104,6 +104,7 @@ function typeOf(file) {
 
 function applyFavoritesHeroState() {
     document.body.classList.add('is-favorites');
+    document.body.classList.remove('is-playlist');
     if (els.heroEyebrow) els.heroEyebrow.textContent = 'Playlist';
     if (els.heroTitle) els.heroTitle.textContent = 'Liked Tracks';
     if (els.heroCompany) els.heroCompany.textContent = 'Your favorite tracks';
@@ -111,8 +112,22 @@ function applyFavoritesHeroState() {
     if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
 }
 
+function applyPlaylistHeroState(playlist) {
+    document.body.classList.add('is-playlist');
+    document.body.classList.remove('is-favorites');
+    const title = playlist && typeof playlist.title === 'string' && playlist.title.trim()
+        ? playlist.title.trim()
+        : 'Playlist';
+    if (els.heroEyebrow) els.heroEyebrow.textContent = 'Playlist';
+    if (els.heroTitle) els.heroTitle.textContent = title;
+    if (els.heroCompany) els.heroCompany.textContent = playlist && playlist.type === 'public' ? 'Public playlist' : 'Curated tracks';
+    if (els.heroYear) els.heroYear.textContent = '';
+    if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
+}
+
 function clearFavoritesHeroState() {
     document.body.classList.remove('is-favorites');
+    document.body.classList.remove('is-playlist');
     if (els.heroEyebrow) els.heroEyebrow.textContent = 'Game';
 }
 
@@ -325,6 +340,8 @@ function getIndexFiltersFromFragment() {
     const params = new URLSearchParams(queryString);
     const game = params.get('game');
     const favorites = params.has('favorites');
+    const playlist = params.has('playlist');
+    const playlistId = params.get('id');
 
     const filters = {};
     if (typeof game === 'string' && game.trim()) {
@@ -332,6 +349,9 @@ function getIndexFiltersFromFragment() {
     }
     if (favorites) {
         filters.favorites = true;
+    }
+    if (playlist && typeof playlistId === 'string' && playlistId.trim()) {
+        filters.playlist = playlistId.trim();
     }
     return filters;
 }
@@ -391,6 +411,47 @@ async function loadFavoritesPlaylist() {
     }
 }
 
+async function loadPlaylistById(id) {
+    try {
+        const [response] = await Promise.all([
+            broker.request('shell.queryPlaylist', { id }, {
+                target: 'shell',
+                timeoutMs: 15000,
+            }),
+            queryFavorites(),
+        ]);
+
+        const errorMessage = response && typeof response.error === 'string' ? response.error : '';
+        const playlist = response && response.playlist && typeof response.playlist === 'object'
+            ? response.playlist
+            : null;
+        const playlistTracks = Array.isArray(response && response.tracks) ? response.tracks : [];
+
+        if (errorMessage) {
+            applyPlaylistHeroState(null);
+            tracks = [];
+            currentIndex = -1;
+            renderTracks();
+            setStatus(errorMessage);
+            return;
+        }
+
+        applyPlaylistHeroState(playlist);
+        handleIndexLoaded({
+            source: playlist && playlist.id ? 'playlist:' + playlist.id : 'playlist:' + id,
+            tracks: playlistTracks,
+            selectedIndex: playlistTracks.length > 0 ? 0 : -1,
+        });
+    } catch (error) {
+        console.error('Failed to load playlist', id, error);
+        applyPlaylistHeroState(null);
+        tracks = [];
+        currentIndex = -1;
+        renderTracks();
+        setStatus('Error loading playlist (see console)');
+    }
+}
+
 function evaluateFragmentParameters() {
     const filters = getIndexFiltersFromFragment();
 
@@ -399,6 +460,12 @@ function evaluateFragmentParameters() {
     if (filters.favorites) {
         applyFavoritesHeroState();
         loadFavoritesPlaylist();
+        return;
+    }
+
+    if (typeof filters.playlist === 'string' && filters.playlist) {
+        applyPlaylistHeroState(null);
+        loadPlaylistById(filters.playlist);
         return;
     }
 

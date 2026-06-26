@@ -230,7 +230,7 @@ function handlePrimaryAction(item) {
     case 'games':
         return openPlaylist(item.id);
     case 'playlists':
-        return playPlaylist(item);
+        return openPlaylistView(item.id);
     case 'platforms':
         return browsePlatformGames(item);
     case 'artists':
@@ -245,7 +245,7 @@ function handlePlayAction(event, item) {
     case 'games':
         return playGame(item);
     case 'playlists':
-        return playPlaylist(item);
+        return openPlaylistView(item.id);
     default:
         return;
     }
@@ -307,9 +307,10 @@ async function playGame(game) {
 
 /* ── Stubbed type actions (no data fetching yet) ── */
 
-function playPlaylist(item) {
-    const name = itemTitle(item);
-    setStatus('Playlist playback not yet implemented for ' + name);
+function openPlaylistView(playlistId) {
+    if (typeof playlistId !== 'string' || !playlistId.trim()) return;
+    const target = '/playlist.html#?playlist&id=' + encodeURIComponent(playlistId.trim());
+    window.location.assign(target);
 }
 
 function browsePlatformGames(item) {

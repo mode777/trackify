@@ -152,6 +152,10 @@ The actual topic traffic, organized by direction:
 | ---------------------- | ------------ | -------------------------------------------------- |
 | `shell.queryIndex`     | content      | tracks for a game (or all)                         |
 | `shell.queryGames`     | content      | games list, optionally filtered by id / platform   |
+| `shell.queryArtists`   | content      | artists list, optionally filtered by name          |
+| `shell.queryPlaylists` | content      | playlists list, filtered by `type` (default `public`) |
+| `shell.queryPlaylist`  | content      | single playlist by `id` + its tracks               |
+| `shell.createPlaylist` | content      | create a private playlist for the current user     |
 | `shell.queryFavorites` | content      | current user's favorites playlist                  |
 | `shell.queryUser`      | content      | current PocketBase auth state + user record        |
 
@@ -208,8 +212,36 @@ type PlaylistSelectedEventPayload = {
 
 The `file` field must be resolvable from the player frame's origin.
 For PocketBase-backed tracks, the shell rewrites it to
-`/api/files/games/<gameId>/<filename>` (see
+`/api/files/games/<gameId>/` (see
 `ShellCatalogService#resolveFilename` in `web/catalog_service.js`).
+
+## 7.1. `shell.queryPlaylist` payload
+
+The content frame calls `shell.queryPlaylist` with `{ id }` to load a
+single playlist by its PocketBase record id. The shell responds with
+the playlist metadata and its tracks in `playlist_tracks_view` order:
+
+```ts
+type QueryPlaylistRequest = {
+  id: string;                    // PocketBase record id of the playlists row
+};
+
+type QueryPlaylistResponse = {
+  tracks: PlaylistTrackEntry[];  // same shape as `playlist.selected.tracks`
+  playlist: {
+    id: string;
+    title: string;
+    type: 'private' | 'public' | 'favorites';
+  } | null;
+  error: string;                 // '' on success; 'Playlist not found' / load error otherwise
+};
+```
+
+The response reuses the same track entry shape as `playlist.selected`,
+so the content frame can hand the response straight to the existing
+`handleIndexLoaded` pipeline. Access respects the PocketBase `playlists`
+list rule (`type='public' || @request.auth.id = user.id`); an
+unauthorised id resolves to `error: 'Playlist not found'`.
 
 ## 8. Adding a new topic
 

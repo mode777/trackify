@@ -437,6 +437,9 @@ function initBroker() {
     shellBroker.handleRequest('shell.queryPlaylists', async ({ payload }) => {
         return catalogService.queryPlaylists(payload || {});
     });
+    shellBroker.handleRequest('shell.queryPlaylist', async ({ payload }) => {
+        return catalogService.queryPlaylist(payload && payload.id);
+    });
     shellBroker.handleRequest('shell.createPlaylist', async ({ payload }) => {
         return catalogService.createPlaylist(payload && payload.title);
     });
