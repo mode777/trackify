@@ -1,6 +1,12 @@
 'use strict';
 
 import PocketBase from 'pocketbase';
+import {
+    PLAYLIST_PALETTE,
+    PLAYLIST_MUSIC_ICONS,
+    isPlaylistIcon,
+    isHexColor,
+} from './playlist_meta.js';
 
 const TRACKS_COLLECTION = 'tracks_view';
 const GAMES_COLLECTION = 'games';
@@ -16,6 +22,12 @@ const EXTENSIONS = {
     n64: ['usf', 'miniusf', 'usflib'],
     vgm: ['vgm', 'vgz', 'cmf', 'dro'],
 };
+
+function pickRandomChoice(list) {
+    if (!Array.isArray(list) || list.length === 0) return '';
+    const index = Math.floor(Math.random() * list.length);
+    return list[index];
+}
 
 export class ShellCatalogService {
     constructor() {
@@ -97,6 +109,8 @@ export class ShellCatalogService {
             title: resolvedTitle,
             type: 'private',
             user: userId,
+            color: pickRandomChoice(PLAYLIST_PALETTE),
+            icon: pickRandomChoice(PLAYLIST_MUSIC_ICONS),
         });
         return this.parsePlaylistsManifest([record])[0];
     }
@@ -125,6 +139,27 @@ export class ShellCatalogService {
                 throw new Error('Title is reserved');
             }
             payload.title = trimmedTitle;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(updates, 'color')) {
+            if (typeof updates.color !== 'string' || !isHexColor(updates.color)) {
+                throw new Error('Invalid playlist color');
+            }
+            payload.color = updates.color.trim().toLowerCase();
+        }
+
+        if (Object.prototype.hasOwnProperty.call(updates, 'icon')) {
+            if (typeof updates.icon !== 'string' || !isPlaylistIcon(updates.icon)) {
+                throw new Error('Invalid playlist icon');
+            }
+            payload.icon = updates.icon.trim();
+        }
+
+        if (Object.prototype.hasOwnProperty.call(updates, 'type')) {
+            if (typeof updates.type !== 'string' || (updates.type !== 'private' && updates.type !== 'public')) {
+                throw new Error('Invalid playlist type');
+            }
+            payload.type = updates.type;
         }
 
         if (!Object.keys(payload).length) {
@@ -274,7 +309,7 @@ export class ShellCatalogService {
             let filter;
             if (typeFilter === 'own') {
                 const userId = this.pb.authStore.record.id;
-                filter = `user="${userId}"`;
+                filter = `user="${userId}" && type != "favorites"`;
             } else {
                 filter = `type="${typeFilter}"`;
             }
@@ -497,6 +532,8 @@ export class ShellCatalogService {
             title: typeof entry.title === 'string' ? entry.title.trim() : '',
             type: typeof entry.type === 'string' ? entry.type : '',
             userId: typeof entry.user === 'string' ? entry.user : '',
+            color: typeof entry.color === 'string' && entry.color ? entry.color : pickRandomChoice(PLAYLIST_PALETTE),
+            icon: typeof entry.icon === 'string' && entry.icon ? entry.icon : pickRandomChoice(PLAYLIST_MUSIC_ICONS),
         }));
     }
 

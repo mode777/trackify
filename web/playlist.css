@@ -74,8 +74,27 @@
 
 .is-favorites .hero-art {
     background:
-        linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
-        radial-gradient(circle at 30% 20%, #3d6b7a, #1f3a4a 58%, #0f1f25 100%);
+        linear-gradient(135deg,
+            color-mix(in srgb, var(--accent) 38%, #2a3354) 0%,
+            color-mix(in srgb, var(--accent) 18%, #1a2143) 55%,
+            #131a36 100%);
+}
+
+.hero-playlist-icon {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-items: center;
+    font-size: 168px;
+    line-height: 1;
+    color: var(--playlist-accent, var(--accent));
+    pointer-events: none;
+    text-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    opacity: 0.4;
+}
+
+.is-playlist .hero-playlist-icon {
+    display: grid;
 }
 
 .hero-art:focus-visible {
@@ -145,6 +164,136 @@
     line-height: 1;
 }
 
+.hero-art-edit-popover {
+    margin-top: 14px;
+    padding: 14px;
+    width: min(280px, 100%);
+    background: var(--panel-high);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-family: Geist, sans-serif;
+}
+
+.hero-art-edit-popover[hidden] {
+    display: none;
+}
+
+.hero-art-edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.hero-art-edit-label {
+    font-weight: 600;
+}
+
+.hero-art-edit-color-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hero-art-edit-popover input[type='color'] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 44px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.hero-art-edit-popover input[type='color']::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.hero-art-edit-popover input[type='color']::-webkit-color-swatch {
+    border: 0;
+    border-radius: 6px;
+}
+
+.hero-art-edit-popover input[type='color']::-moz-color-swatch {
+    border: 0;
+    border-radius: 6px;
+}
+
+.hero-art-edit-swatch {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: var(--accent);
+}
+
+.hero-art-edit-popover select {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    padding: 8px 32px 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%) calc(100% - 14px) 14px / 6px 6px no-repeat,
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%) calc(100% - 9px) 14px / 6px 6px no-repeat,
+        rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.92rem;
+    letter-spacing: 0;
+    text-transform: none;
+    cursor: pointer;
+}
+
+.hero-art-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.hero-art-edit-button {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.hero-art-edit-button:hover,
+.hero-art-edit-button:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.hero-art-edit-button.primary {
+    background: var(--accent);
+    color: #002f37;
+    border-color: transparent;
+}
+
+.hero-art-edit-button.primary:hover,
+.hero-art-edit-button.primary:focus-visible {
+    background: color-mix(in srgb, var(--accent) 85%, white);
+}
+
 .hero-title-edit {
     appearance: none;
     -webkit-appearance: none;
@@ -175,6 +324,84 @@
     align-items: center;
     gap: 10px;
     color: var(--muted);
+}
+
+.public-toggle {
+    margin: 14px 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+    font-family: Geist, sans-serif;
+    font-size: 0.86rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.public-toggle[hidden] {
+    display: none;
+}
+
+.public-toggle input[type='checkbox'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.public-toggle-switch {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    transition: background-color 160ms ease;
+    flex-shrink: 0;
+}
+
+.public-toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #f7f8ff;
+    border-radius: 999px;
+    transition: transform 160ms ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.public-toggle input[type='checkbox']:checked + .public-toggle-switch {
+    background: var(--accent);
+}
+
+.public-toggle input[type='checkbox']:checked + .public-toggle-switch::after {
+    transform: translateX(16px);
+}
+
+.public-toggle:hover .public-toggle-switch {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.public-toggle input[type='checkbox']:checked:hover + .public-toggle-switch {
+    background: color-mix(in srgb, var(--accent) 88%, white);
+}
+
+.public-toggle input[type='checkbox']:focus-visible + .public-toggle-switch {
+    outline: 2px solid color-mix(in srgb, var(--accent) 75%, white);
+    outline-offset: 2px;
+}
+
+.public-toggle.is-busy {
+    opacity: 0.6;
+    cursor: progress;
 }
 
 .dot {

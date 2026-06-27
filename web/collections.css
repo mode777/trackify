@@ -236,6 +236,40 @@
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.54));
 }
 
+.collection-cover.is-playlist-art {
+    background:
+        linear-gradient(135deg,
+            color-mix(in srgb, var(--playlist-accent, #d2bbff) 38%, #2a3354) 0%,
+            color-mix(in srgb, var(--playlist-accent, #d2bbff) 18%, #1a2143) 55%,
+            #131a36 100%);
+}
+
+.collection-cover.is-playlist-art::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.18));
+    pointer-events: none;
+}
+
+.collection-art-icon {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: clamp(72px, 14vw, 120px);
+    line-height: 1;
+    color: var(--playlist-accent, #fff);
+    opacity: 0.4;
+    pointer-events: none;
+    text-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    z-index: 0;
+}
+
+.collection-cover.is-playlist-art .collection-play-button {
+    z-index: 1;
+}
+
 .collection-play-button {
     position: absolute;
     right: 10px;

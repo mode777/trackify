@@ -16,6 +16,7 @@
 <main class="playlist-root">
     <section class="hero">
         <button class="hero-art" type="button" aria-label="Play selected list">
+            <span class="hero-playlist-icon material-symbols-outlined" aria-hidden="true"></span>
             <span class="hero-favorite-icon material-symbols-outlined filled" aria-hidden="true">favorite</span>
             <div class="hero-play" aria-hidden="true"><span class="material-symbols-outlined filled">play_circle</span></div>
         </button>
@@ -26,8 +27,33 @@
                 <button id="heroEditButton" class="hero-edit-button" type="button" aria-label="Edit playlist title" hidden>
                     <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                 </button>
+                <button id="heroArtEditButton" class="hero-edit-button" type="button" aria-label="Edit playlist art" hidden aria-expanded="false">
+                    <span class="material-symbols-outlined" aria-hidden="true">palette</span>
+                </button>
             </div>
             <p class="meta"><span id="heroCompany">Company Name</span> <span id="heroMetaDot" class="dot"></span> <span id="heroYear">Year</span></p>
+            <label id="publicToggleLabel" class="public-toggle" hidden>
+                <input id="publicToggle" type="checkbox" />
+                <span class="public-toggle-switch" aria-hidden="true"></span>
+                <span class="public-toggle-text">Public playlist</span>
+            </label>
+            <div id="heroArtEditPopover" class="hero-art-edit-popover" role="dialog" aria-label="Edit playlist art" hidden>
+                <label class="hero-art-edit-field">
+                    <span class="hero-art-edit-label">Color</span>
+                    <span class="hero-art-edit-color-row">
+                        <input id="heroArtEditColor" type="color" />
+                        <span id="heroArtEditColorSwatch" class="hero-art-edit-swatch" aria-hidden="true"></span>
+                    </span>
+                </label>
+                <label class="hero-art-edit-field">
+                    <span class="hero-art-edit-label">Icon</span>
+                    <select id="heroArtEditIcon"></select>
+                </label>
+                <div class="hero-art-edit-actions">
+                    <button id="heroArtEditCancel" class="hero-art-edit-button" type="button">Cancel</button>
+                    <button id="heroArtEditSave" class="hero-art-edit-button primary" type="button">Save</button>
+                </div>
+            </div>
         </div>
     </section>
 

@@ -8,30 +8,43 @@ the broker API, and the topics currently in use.
 
 ## 1. Scope
 
-Trackify's UI is a small iframe microservice topology:
+Trackify's UI is a small iframe microservice topology. The shell hosts
+two iframes that are swapped in or reused as the user navigates:
 
 - **Shell frame** — controller + message broker. Hosts the navigation
-  chrome and routes every message between services.
-- **Content frame** — content-domain UI (currently `collections.html`
-  and `playlist.html`). Speaks to the shell for catalog data and to
-  the player for playback.
-- **Player frame** — transport controls and the Web Audio pipeline
-  (`player.html`). Owns `ScriptNodePlayer` and the lazy-loaded
-  `backend_*.js` runtimes.
+  chrome and routes every message between services. Registers as the
+  `'shell'` service (`web/app.js`).
+- **Content frame** (`<iframe name="content-frame">`) — the two
+  content services are swapped into this slot via
+  `target="content-frame"` links:
+  - `'games'` service — `collections.html` / `collections.js`. The
+    games / playlists / platforms / artists grids. Speaks to the
+    shell for catalog data and to the player for playback.
+  - `'playlist'` service — `playlist.html` / `playlist.js`. The
+    per-game / per-playlist track list and the add-to-playlist
+    popup.
+- **Player frame** (`<iframe id="playerFrame">`) — the `'player'`
+  service. Transport controls and the Web Audio pipeline
+  (`player.html`, `web/player/*.js`). Owns `ScriptNodePlayer` and the
+  lazy-loaded `backend_*.js` runtimes. Loaded once and reused for
+  the whole session.
 
 All inter-frame communication is via `window.postMessage` and routed
 through the shell. There is no direct frame-to-frame messaging.
 
 ```mermaid
 flowchart TD
-    Shell[Shell Frame<br/>app.js + broker.js]
-    Content[Content Frame<br/>collections.js / playlist.js]
-    Player[Player Frame<br/>player.js + player/* modules]
+    Shell[Shell<br/>serviceId: 'shell'<br/>app.js + broker.js]
+    Games[Games<br/>serviceId: 'games'<br/>collections.js]
+    Playlist[Playlist<br/>serviceId: 'playlist'<br/>playlist.js]
+    Player[Player<br/>serviceId: 'player'<br/>player.js + player/*]
 
-    Content <-- postMessage --> Shell
-    Player  <-- postMessage --> Shell
+    Games    <-- postMessage --> Shell
+    Playlist <-- postMessage --> Shell
+    Player   <-- postMessage --> Shell
 
-    Shell -. event fanout .-> Content
+    Shell -. event fanout .-> Games
+    Shell -. event fanout .-> Playlist
     Shell -. event fanout .-> Player
 ```
 
@@ -52,9 +65,12 @@ It exposes one `TrackifyBroker` class with two factory entry points:
   allowedOrigins })` — high-level API for content/player frames. Talks
   to `window.parent` only.
 
-The broker keeps a service registry (`shell`, `content`, `player`,
-`games`, `playlist`), rejects messages from unknown services, and
-isolates frames from each other.
+The broker keeps a service registry (`shell`, `player`, `games`,
+`playlist`), rejects messages from unknown services, and isolates
+frames from each other. Each frame calls `createFrameBroker({ serviceId })`
+once at startup; the shell learns about them either via the
+`control/service.register` handshake or via `registerService()` when
+the shell is the one that opens the iframe.
 
 ## 3. Message envelope
 
@@ -68,8 +84,8 @@ type TrackifyMessage = {
   timestamp: string;           // ISO-8601
   type: 'control' | 'event' | 'request' | 'response' | 'error';
   topic: string;
-  source: 'shell' | 'content' | 'player' | 'games' | 'playlist';
-  target?: 'shell' | 'content' | 'player' | 'games' | 'playlist' | '*';
+  source: 'shell' | 'player' | 'games' | 'playlist';
+  target?: 'shell' | 'player' | 'games' | 'playlist' | '*';
   payload?: unknown;
   meta?: {
     timeoutMs?: number;        // request-level timeout override
@@ -111,7 +127,7 @@ Both factory entry points return a broker with the same surface:
 
 ```js
 const broker = createFrameBroker({
-  serviceId: 'content',
+  serviceId: 'games',         // 'shell' | 'player' | 'games' | 'playlist'
   targetOrigin: window.location.origin,
   requestTimeoutMs: 4000,
   allowedOrigins: [window.location.origin],
@@ -125,6 +141,7 @@ broker.publish(topic, payload, options?);   // { target, ... }
 broker.request(topic, payload, options?);   // Promise; resolves on response, rejects on error/timeout
 broker.handleRequest(topic, async ({ payload }) => result);   // shell only
 broker.registerService(serviceId, frameWindow, options?);     // shell only
+broker.routeRequestTopic(topic, serviceId);                  // shell only — route a request topic directly to a frame service instead of a shell-local handler
 ```
 
 The `target` option in `publish` / `request` accepts a single service
@@ -148,17 +165,20 @@ The actual topic traffic, organized by direction:
 
 ### Shell-local request handlers
 
-| Topic                  | Requested by | Purpose                                            |
-| ---------------------- | ------------ | -------------------------------------------------- |
-| `shell.queryIndex`     | content      | tracks for a game (or all)                         |
-| `shell.queryGames`     | content      | games list, optionally filtered by id / platform   |
-| `shell.queryArtists`   | content      | artists list, optionally filtered by name          |
-| `shell.queryPlaylists` | content      | playlists list, filtered by `type` (default `public`) |
-| `shell.queryPlaylist`  | content      | single playlist by `id` + its tracks               |
-| `shell.createPlaylist` | content      | create a private playlist for the current user     |
-| `shell.updatePlaylist` | content      | update an owned playlist (currently: title only)   |
-| `shell.queryFavorites` | content      | current user's favorites playlist                  |
-| `shell.queryUser`      | content      | current PocketBase auth state + user record        |
+| Topic                       | Requested by | Purpose                                            |
+| --------------------------- | ------------ | -------------------------------------------------- |
+| `shell.queryIndex`          | content      | tracks for a game (or all)                         |
+| `shell.queryGames`          | content      | games list, optionally filtered by id / platform   |
+| `shell.queryArtists`        | content      | artists list, optionally filtered by name          |
+| `shell.queryPlaylists`      | content      | playlists list, filtered by `type` (default `public`). `type=own` returns every playlist the current user owns except the row with `type="favorites"` (the favorites playlist has its own dedicated hero/link and is never surfaced in a grid). |
+| `shell.queryPlaylistsForTrack` | content   | playlist ids owned by the current user that already contain a given track |
+| `shell.addTrackToPlaylist`  | content      | append a track to a playlist owned by the current user |
+| `shell.removeTrackFromPlaylist` | content | remove a track from a playlist owned by the current user |
+| `shell.queryPlaylist`       | content      | single playlist by `id` + its tracks               |
+| `shell.createPlaylist`      | content      | create a private playlist for the current user     |
+| `shell.updatePlaylist`      | content      | update an owned playlist (currently: title only)   |
+| `shell.queryFavorites`      | content      | current user's favorites playlist                  |
+| `shell.queryUser`           | content      | current PocketBase auth state + user record        |
 
 ### Shell → content/player
 
@@ -260,6 +280,9 @@ type UpdatePlaylistRequest = {
   id: string;                    // PocketBase record id of the playlist
   updates: {
     title?: string;              // trimmed; must be non-empty and not '__fav__'
+    color?: string;              // CSS hex color, must match `#rrggbb`
+    icon?: string;               // Material Symbols ligature; must be in PLAYLIST_MUSIC_ICONS
+    type?: 'private' | 'public'; // visibility; 'favorites' is reserved and rejected
   };
 };
 
@@ -268,11 +291,14 @@ type UpdatePlaylistResponse = {
   title: string;
   type: 'private' | 'public' | 'favorites';
   userId: string;
+  color: string;
+  icon: string;
 };
 ```
 
 Failures reject with a `request_failed` error whose `message` is
 `'Playlist not found'`, `'Title cannot be empty'`, `'Title is reserved'`,
+`'Invalid playlist color'`, `'Invalid playlist icon'`, `'Invalid playlist type'`,
 or `'Failed to update playlist'` depending on the failure mode.
 
 ## 8. Adding a new topic
@@ -284,9 +310,13 @@ or `'Failed to update playlist'` depending on the failure mode.
 3. If it crosses the shell, add the new topic to the
    `allowedServices` allowlist only if you are also introducing a new
    service id (the broker routes by service, not by topic).
-4. Add the new request handler on the shell with
-   `shellBroker.handleRequest(...)` in `web/app.js#initBroker`, or
-   subscribe to the event on the receiving side.
+4. Decide where the request is handled:
+   - Shell-local handler — `shellBroker.handleRequest(...)` in
+     `web/app.js#initBroker`.
+   - Forwarded to another frame — `shellBroker.routeRequestTopic(...)`
+     so the shell routes incoming requests of that topic straight to
+     the target service instead of a shell-local handler.
+   - Subscribe to the event on the receiving side.
 5. Document the payload in this file.
 
 ## 9. Security baseline

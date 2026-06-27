@@ -139,7 +139,12 @@ trackify/
 ├── Dockerfile                    # pocketbase + build/dist
 ├── publish.sh                    # buildx + push entry point
 └── docs/
-    └── audio-backends.md         # detailed backend integration reference
+    ├── audio-backends.md         # detailed backend integration reference
+    ├── database.md              # PocketBase schema, fields, API rules, auth lifecycle
+    ├── deploy.md                # Docker image + publish.sh + runtime
+    ├── frontend.md              # Vite config + iframe topology + shell responsibilities
+    ├── tools.md                  # tools/*.mjs reference + env vars
+    └── ui.md                     # iframe broker contract + topics
 ```
 
 ## WASM audio backends
@@ -176,59 +181,18 @@ walkthrough — see [`docs/audio-backends.md`](docs/audio-backends.md).
 ## Frontend (Vite + iframes)
 
 The web app is a Vite project rooted at `web/`. Vite builds four HTML
-entry points (see `vite.config.mjs`):
+entry points (`index.html`, `collections.html`, `playlist.html`,
+`player.html`) that load the shell + two iframe slots: a content
+slot (`#playlistFrame`, swapped between the games and playlist
+services) and a player slot (`#playerFrame`, loaded once for the
+session). All inter-frame communication goes through a single
+shared `web/broker.js`; the message contract lives in
+[`docs/ui.md`](docs/ui.md).
 
-- `index.html` — the **shell**. Hosts the sidebar / nav / search
-  chrome and **two iframes**:
-  - `#playlistFrame` (`name="content-frame"`) — content services:
-    `collections.html` (games grid) and `playlist.html` (per-game
-    track list).
-  - `#playerFrame` — the player service: `player.html` plus the
-    `web/player/*.js` modules.
-- `collections.html` / `playlist.html` — the content frame, swapped
-  in via `target="content-frame"` links.
-- `player.html` — the player frame, which is loaded once and reused
-  for the whole session.
-
-All inter-frame communication is via a single shared
-`web/broker.js` using `window.postMessage` with a versioned envelope.
-There is no direct frame-to-frame messaging; the shell validates,
-routes, and fanouts every message. The full message contract, the
-broker API, and the topics currently in use live in
-[`ui.md`](ui.md).
-
-The player frame is split into small modules under `web/player/`:
-
-```
-web/player/
-├── dom.js                    # cached element lookups
-├── player_host.js            # ScriptNodePlayer / runtime namespace
-├── backend_loader.js         # lazy-load /wasm/backend_*.js
-├── backend_catalog.js        # extension → backend-type → script-src map
-├── transport.js              # playlist state + play/pause/next/seek/shuffle
-├── seek_ui.js                # seek bar + 250 ms position polling
-├── now_playing_ui.js         # footer track info + play button state
-├── media_session_sync.js     # navigator.mediaSession binding
-├── media_session_anchor.js   # silent audio shim to keep media controls alive
-├── shuffle_ui.js             # shuffle toggle button binding
-└── volume_ui.js              # volume slider binding
-```
-
-The shell (`web/app.js`) wires it all together: PocketBase SDK
-construction, auth (Google OAuth), iframe history buttons, the
-favorites playlist flow, and the shell-side `navigator.mediaSession`
-binding that lets OS-level media keys control the player even when
-the player iframe is in a different frame tree.
-
-Vite config notes:
-
-- The dev server binds to `127.0.0.1:8137` with `strictPort: true` —
-  do not change.
-- `npm run build` produces `build/dist/` with the four HTML pages
-  hashed and the contents of `build/web-public/wasm/` copied in.
-- `npm run dev-js` / `npm run build:watch` /
-  `npm run build:watch-js` skip the WASM rebuild — use these after
-  the first build when iterating on web code.
+Full reference (Vite config flags, iframe topology, per-frame
+module breakdown, shell responsibilities, dev workflows, "add a
+new page" walkthrough) lives in
+[`docs/frontend.md`](docs/frontend.md).
 
 ## PocketBase backend
 
@@ -237,128 +201,27 @@ from a running PocketBase instance via the `pocketbase` JS SDK. The
 static build works without a running PocketBase, but the UI simply
 has no catalog to show.
 
-### Download the binary
+Get a local instance with:
 
 ```bash
 npm run pocketbase:download   # writes bin/pocketbase (or .exe on Windows)
+npm run pocketbase:serve      # serves ./build/dist + runs ./pb_migrations + ./pb_hooks
 ```
 
-The script auto-resolves the latest release matching your OS/arch;
-override with `--platform` / `--arch` if needed. The binary is
-gitignored (`bin/`).
-
-### Run the dev server
-
-```bash
-npm run pocketbase:serve
-# ≡  bin/pocketbase serve
-#      --publicDir ./build/dist
-#      --dir ./pb_data
-#      --hooksDir ./pb_hooks
-```
-
-Layout:
-
-- `bin/pocketbase` — the server binary.
-- `pb_data/` — local database, created on first run (gitignored).
-- `pb_hooks/` — JS server hooks. `keep_names.pb.js` rewrites
-  uploaded `originalName` → `name` on the `games` collection's
-  `files[]` and `coverArt` fields (create + update).
-- `pb_migrations/` — JS schema migrations, applied in filename order
-  on startup. The migration set defines base collections, several
-  view collections, and the favorites / playlist flows.
-- `--publicDir ./build/dist` — PocketBase serves the static build
-  here, so run `npm run build` at least once before this is useful.
-
-### Schema (high level)
-
-- `users` — PocketBase auth users (Google OAuth via
-  `pb.collection('users').authWithOAuth2({ provider: 'google' })`).
-- `games` — game metadata: `title`, `company[]`, `year`, `platform`,
-  `coverArt` (file), and a `files[]` field holding the bundled
-  track files for that game.
-- `tracks` — individual track records: `title`, `gameId`,
-  `filename`, `platform`, `artist[]`, `metadata` (raw core-emitted
-  tag dump), and the derived `coverArt`.
-- `playlists` — user-owned playlists. `type="favorites"` is reserved
-  for the auto-created favorites playlist (one per user, lazily
-  provisioned).
-- `playlist_tracks` — join rows linking a track to a playlist, with
-  ordering.
-- `favorites` / `playlist_tracks` — backing data for the favorites
-  flow.
-
-The migration set also defines several view collections the web app
-reads from:
-
-- `games_view` — flattened game metadata with resolved cover-art URLs.
-- `tracks_view` — flattened tracks with resolved `coverArt` /
-  `file` URLs and joined `game` display name. This is the collection
-  `ShellCatalogService` queries.
-- `favorites_view` — joined favorites tracks.
-- `playlist_tracks_view` — joined playlist rows with track metadata.
-
-### Client auth
-
-The web client authenticates to PocketBase with the JWT in `.env` as
-`TRACKIFY_PB_TOKEN`. Vite loads it into the web bundle at build time;
-the Node tooling does **not** read it. The browser-side
-`authWithOAuth2({ provider: 'google' })` flow populates
-`pb.authStore`; the shell publishes `shell.user.login` /
-`shell.user.logout` events to frames so the favorites UI updates
-without a page reload.
-
-### Typical dev loop
-
-```bash
-# shell A — frontend
-source ./submodules/emsdk/emsdk_env.sh
-npm run dev
-
-# shell B — catalog
-npm run pocketbase:serve
-```
+Schema (collections, fields, API rules, view collections, hooks,
+JavaScript API, the `TRACKIFY_PB_TOKEN` / `authWithOAuth2` client
+auth lifecycle) is documented in
+[`docs/database.md`](docs/database.md).
 
 ## Sample data tooling
 
 The `sample-files/` directory is **reference data, not a staged web
-asset**. It is the corpus that the `tools/*.mjs` scripts scan to
-produce the manifests the web app originally used to ship without a
-PocketBase backend.
+asset**. The `tools/*.mjs` scripts scan it, fetch missing cover art
+via Wikipedia, and push the resulting `index.json` + `games.json` to
+PocketBase.
 
-```bash
-npm run samples:index        # regenerate sample-files/{index,games}.json
-npm run samples:coverart     # fetch missing cover art, update games.json
-npm run samples:upload-index # upload regenerated index.json to PocketBase
-```
-
-`tools/fetch-missing-cover-art.mjs` looks up art via Wikipedia
-summary metadata first, then falls back to MediaWiki page-image, then
-scrapes the game page infobox image as a final fallback. The
-following env vars tune the run:
-
-- `TRACKIFY_FETCH_COVER_ART_DRY_RUN=1` — print matches without
-  writing files.
-- `TRACKIFY_FETCH_COVER_ART_MAX_PER_RUN` — cap downloads per run
-  (default 25).
-- `TRACKIFY_FETCH_COVER_ART_TIMEOUT_MS` — per-request timeout in ms
-  (default 8000).
-- `TRACKIFY_FETCH_COVER_ART_REQUEST_DELAY_MS` — delay between
-  MediaWiki requests in ms (default 250).
-- `TRACKIFY_FETCH_COVER_ART_RETRY_MAX_ATTEMPTS` — max retries for
-  rate-limited lookups (default 4).
-- `TRACKIFY_FETCH_COVER_ART_RETRY_BASE_DELAY_MS` — base backoff
-  delay for HTTP 429 retries in ms (default 1000; exponential
-  1x, 2x, 4x, … when `Retry-After` is not provided).
-- `TRACKIFY_FETCH_COVER_ART_MAX_BYTES` — max downloaded image size
-  in bytes (default 5242880).
-- `TRACKIFY_FETCH_COVER_ART_ALLOW_NON_COMMONS=0` — restrict to
-  Wikimedia Commons-hosted assets only (enabled by default).
-- `TRACKIFY_FETCH_COVER_ART_INSECURE_TLS=0` — enforce TLS
-  certificate verification (disabled by default).
-
-`tools/inspect-genh.mjs` is a small CLI for dumping metadata from
-local `.genh` files (handy when adding a new game to the corpus).
+Per-tool reference (purpose, env vars, exit codes, direct
+invocation) lives in [`docs/tools.md`](docs/tools.md).
 
 ## Docker / deploy
 
@@ -371,7 +234,9 @@ pb_hooks/       →  /pocketbase/hooks/
 ```
 
 so the resulting image serves the static web build and runs the
-PocketBase migrations / hooks from a single container.
+PocketBase migrations / hooks from a single container. Detailed
+reference (build context, base-image assumptions, runtime data
+persistence, release checklist) in [`docs/deploy.md`](docs/deploy.md).
 
 ```bash
 # 1. Build the static site first
@@ -389,43 +254,16 @@ build artefacts are picked up straight from `build/dist/` /
 
 ## Useful scripts reference
 
-All scripts live in `package.json`. The non-obvious ones:
+All scripts live in `package.json`. Per-script reference (purpose,
+env vars, exit semantics, direct invocation) lives in
+[`docs/tools.md`](docs/tools.md#quick-reference).
 
-```bash
-npm run wasm              # emcmake + cmake build (player + 5 backends)
-npm run wasm:configure    # emcmake cmake -B build -G Ninja -DTRACKIFY_JS_TOOLING=ON
-npm run wasm:build        # cmake --build build --target player backend_*
+Two scripts hardcode the list of required runtime files:
 
-npm run assets:prepare    # copy CMake artifacts → build/web-public/wasm/
-                          # (fails hard if artifacts are missing — never
-                          #  run this before `npm run wasm`)
+- `tools/prepare-web-assets.mjs`
+- `tools/verify-build-output.mjs`
 
-npm run build             # wasm + assets:prepare + vite build
-npm run build:watch       # wasm + assets:prepare + vite build --watch
-npm run build:watch-js    # assets:prepare + vite build --watch  (skip WASM)
-npm run dev               # wasm + assets:prepare + vite  (port 8137)
-npm run dev-js            # assets:prepare + vite  (skip WASM)
-npm run preview           # vite preview  (port 8137)
-npm run verify:dist       # assert runtime files exist under build/dist
-                          # (CI runs this after `npm run build`)
-
-npm run clean             # rm -rf build
-npm run rebuild           # clean + build
-
-npm run samples:index     # rebuild sample-files/{index,games}.json
-npm run samples:coverart  # fetch missing cover art, update games.json
-npm run samples:upload-index
-                          # upload regenerated index.json to PocketBase
-
-npm run pocketbase:download
-                          # fetch bin/pocketbase for current platform/arch
-npm run pocketbase:serve  # serve with ./build/dist as publicDir
-```
-
-The `tools/*.mjs` scripts are CLI utilities, not tests; they
-`process.exit(1)` on failure. `tools/prepare-web-assets.mjs` and
-`tools/verify-build-output.mjs` each hardcode the list of required
-runtime files — update **both** when adding a new backend.
+Update **both** when adding a new backend.
 
 ## Conventions
 

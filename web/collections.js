@@ -107,6 +107,8 @@ function normalizeItem(raw) {
             description: typeof raw.description === 'string' ? raw.description : '',
             trackCount: typeof raw.trackCount === 'number' ? raw.trackCount : 0,
             coverArt: typeof raw.coverArt === 'string' ? raw.coverArt : '',
+            color: typeof raw.color === 'string' ? raw.color : '',
+            icon: typeof raw.icon === 'string' ? raw.icon : '',
         };
 
     case 'platforms':
@@ -370,16 +372,31 @@ function renderCard(item) {
 
     const cover = document.createElement('div');
     cover.className = 'collection-cover';
-    const coverUrl = itemCoverUrl(item);
-    if (coverUrl) {
-        cover.classList.add('has-art');
-        cover.style.setProperty('--cover-url', 'url("' + coverUrl.replace(/"/g, '\\"') + '")');
+    const isPlaylistArt = activeType === 'playlists';
+    if (isPlaylistArt) {
+        cover.classList.add('is-playlist-art');
+        if (typeof item.color === 'string' && item.color) {
+            cover.style.setProperty('--playlist-accent', item.color);
+        }
+        if (typeof item.icon === 'string' && item.icon) {
+            const icon = document.createElement('span');
+            icon.className = 'collection-art-icon material-symbols-outlined';
+            icon.textContent = item.icon;
+            icon.setAttribute('aria-hidden', 'true');
+            cover.appendChild(icon);
+        }
+    } else {
+        const coverUrl = itemCoverUrl(item);
+        if (coverUrl) {
+            cover.classList.add('has-art');
+            cover.style.setProperty('--cover-url', 'url("' + coverUrl.replace(/"/g, '\\"') + '")');
+        }
     }
 
     const playButton = document.createElement('button');
     playButton.type = 'button';
     playButton.className = 'collection-play-button material-symbols-outlined filled';
-    playButton.textContent = activeType === 'playlists' ? 'play_arrow' : 'play_arrow';
+    playButton.textContent = 'play_arrow';
     playButton.setAttribute('aria-label', 'Play ' + itemTitle(item));
     cover.appendChild(playButton);
 
@@ -485,7 +502,12 @@ async function fetchItems() {
 
     const { type: _routeType, ...filters } = paramsFromFragment();
     if (activeType === 'playlists' && typeof filters.playlistType === 'string' && filters.playlistType.trim()) {
-        filters.type = filters.playlistType.trim().toLowerCase();
+        const playlistView = filters.playlistType.trim().toLowerCase();
+        if (playlistView === 'private') {
+            filters.type = 'own';
+        } else {
+            filters.type = playlistView;
+        }
         delete filters.playlistType;
     }
 

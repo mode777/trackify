@@ -12,6 +12,7 @@ export default defineConfig({
     // Preserve existing build outputs while watching to keep iterative rebuilds stable.
     emptyOutDir: !isWatchBuild,
     watch: isWatchBuild ? {} : null,
+    minify: isWatchBuild ? false : 'esbuild',
     rollupOptions: {
       input: {
         main: path.resolve(rootDir, 'index.html'),

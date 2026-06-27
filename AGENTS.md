@@ -2,8 +2,99 @@
 
 VGM (Video Game Music) web player. Hybrid build: CMake + Emscripten for WASM
 backend cores, Node + Vite for the UI, PocketBase for catalog metadata.
-Sources of truth for full context: `README.md` (architecture, ABI, build flow)
-and `ui.md` (iframe broker contract).
+Sources of truth for full context: `README.md` (architecture, ABI, build flow),
+`docs/ui.md` (iframe broker contract), `docs/database.md` (PocketBase schema,
+fields, and API rules), `docs/audio-backends.md` (per-backend ABI + Emscripten
+flags + "add a new backend" walkthrough), `docs/frontend.md` (Vite config +
+iframe topology + shell responsibilities + "add a new page" walkthrough),
+`docs/tools.md` (per-script reference for the `tools/*.mjs` tooling), and
+`docs/deploy.md` (Docker image + `publish.sh` + runtime characteristics).
+
+## Role-based task routing
+
+For every request, evaluate the task first and assign it to exactly
+one role before planning any work. If the user has explicitly assigned
+a role, use that; otherwise pick the role whose files own the dominant
+area of impact. If a change crosses roles, scope the work to the
+assigned role's files and hand off the rest explicitly in the plan.
+
+- **Data engineer** — PocketBase queries, schema / migrations / API
+  rules / hooks / view collections / auth lifecycle, and the
+  cross-frame broker plumbing (topic names, envelope shape,
+  request/response wiring between shell and frames).
+- **UI engineer** — Player chrome, playlist, collections, hero,
+  navigation, popups, and their HTML / CSS counterparts.
+- **Audio engineer** — The WebAudio player (transport,
+  `ScriptProcessor` buffer, `AudioContext` lifecycle, MediaSession),
+  the WASM backends, the pure-JS backends, the `emu_*` ABI, and the
+  CMake / Emscripten build glue.
+
+### Data engineer
+
+Owns the catalog backend and the cross-frame message contract. Read
+first, in order:
+
+- [`docs/database.md`](docs/database.md) — schema, fields, API rules,
+  view collections, hooks, JS API surface, `authWithOAuth2` /
+  `TRACKIFY_PB_TOKEN` lifecycle.
+- [`docs/ui.md`](docs/ui.md) — envelope shape and topic list
+  (anything that travels between frames goes through here).
+- `web/broker.js` — `createShellBroker` / `createFrameBroker`, the
+  versioned envelope.
+- `web/catalog_service.js` — PocketBase SDK calls used by the shell.
+- `pb_migrations/` (schema) and `pb_hooks/` (server-side behaviour).
+- `web/playlist/auth_state.js` — client-side auth wiring.
+
+When changing a collection, field, or rule, update `docs/database.md`
+in the same change. When changing a topic or envelope field, update
+`docs/ui.md` and the broker version in lockstep.
+
+### UI engineer
+
+Owns what the user sees and clicks. Read first, in order:
+
+- [`docs/frontend.md`](docs/frontend.md) — Vite config, iframe
+  topology, shell responsibilities, per-frame module breakdown,
+  "add a new page" walkthrough.
+- `web/index.html`, `web/main.js`, `web/app.js`, `web/app.css` — the
+  shell and its global styling.
+- Per-page frames and their sub-modules:
+  - `web/player.html` / `web/player.css` + `web/player/`
+    (`dom.js`, `now_playing_ui.js`, `seek_ui.js`, `shuffle_ui.js`,
+    `volume_ui.js`, `media_session_anchor.js`).
+  - `web/playlist.html` / `web/playlist.css` + `web/playlist/`
+    (`dom.js`, `playlist_state.js`, `track_list_ui.js`,
+    `track_helpers.js`, `hero_ui.js`, `navigation.js`,
+    `status_ui.js`, `title_edit_ui.js`, `add_to_playlist_popup.js`).
+  - `web/collections.html` / `web/collections.css` / `web/collections.js`.
+
+CSS lives next to the page it styles. New pages follow the
+"add a new page" walkthrough in `docs/frontend.md`.
+
+### Audio engineer
+
+Owns playback and every backend that produces samples. Read first, in
+order:
+
+- [`docs/audio-backends.md`](docs/audio-backends.md) — per-backend
+  ABI, Emscripten flags, "add a new backend" walkthrough.
+- The "Backend integration" and "Emscripten gotchas" sections above
+  — verified working flag set, exports contract, ABI notes.
+- `web/player.js` — `EXT_<CORE>`, `BACKEND_SCRIPT_BY_TYPE`, `typeOf()`
+  switch, the adapter selection mirror with the shell.
+- `web/player/` — `transport.js`, `backend_loader.js`,
+  `backend_catalog.js`, `now_playing_ui.js`, `media_session_*.js`,
+  `shuffle_ui.js`.
+- `backends/<core>/CMakeLists.txt` (template:
+  `backends/snes/CMakeLists.txt`), `cmake/concat.cmake`,
+  `submodules/<core>/emscripten/`, `patches/<core>/emscripten/`.
+- Pure-JS backends copied as-is: `web/backend_xa.js`,
+  `web/backend_genh.js`, `web/backend_mp3.js`.
+
+The `emu_*` ABI is the contract — keep `EXPORTED_FUNCTIONS` in each
+`backends/<core>/CMakeLists.txt` in sync with the per-backend
+`EXPORTS` list and the `emu_*` symbols in
+`submodules/<core>/emscripten/Adapter.cpp`.
 
 ## One-time setup
 
@@ -90,58 +181,67 @@ Glue lives in the repo:
 
 ## UI architecture (non-obvious)
 
-Multi-page app under `web/` (Vite `root`):
+The web app is a multi-page Vite project rooted at `web/`. The full
+reference (Vite config, iframe topology, per-frame module breakdown,
+shell responsibilities, dev workflows, "add a new page" walkthrough)
+lives in [`docs/frontend.md`](docs/frontend.md).
 
-- `index.html` is the **shell**: hosts two iframes (`#playlistFrame` for
-  content like `collections.html`, `#playerFrame` for the player). All inter-frame
-  communication goes through `web/broker.js` (`createShellBroker` /
-  `createFrameBroker`) using `postMessage` with a versioned envelope — no
-  direct frame-to-frame messaging. See `ui.md` for the message contract.
-- `web/app.js` is the shell controller. Imports `pocketbase` JS SDK and
-  fetches catalog from a running PocketBase instance.
-- `web/player.js` owns the audio pipeline: lazy-loads the right
-  `backend_*.js` from `/wasm/` by extension, instantiates a
-  `ScriptNodePlayer`, and drives playback.
-- `web/catalog_service.js`, `web/main.js`, per-page `*.html`/`*.js`/`*.css`
-  are the rest of the UI surface.
+One thing that is easy to miss: all inter-frame communication goes
+through `web/broker.js` (`createShellBroker` / `createFrameBroker`)
+with a versioned envelope — no direct frame-to-frame messaging.
+The message contract and topic list are in
+[`docs/ui.md`](docs/ui.md).
 
 ## PocketBase
 
+PocketBase is the catalog backend. Schema, fields, API rules, view
+collections, hooks, the JavaScript API surface, and the
+`TRACKIFY_PB_TOKEN` / `authWithOAuth2` client auth lifecycle are in
+[`docs/database.md`](docs/database.md).
+
+Agent-relevant specifics not covered in the doc:
+
 - Binary: `bin/pocketbase` (gitignored). Get it with
-  `npm run pocketbase:download` (auto-resolves latest release for the current
-  platform/arch; supports `--platform`/`--arch` overrides).
+  `npm run pocketbase:download` (auto-resolves latest release for the
+  current platform/arch; supports `--platform`/`--arch` overrides).
 - Local dev: `npm run pocketbase:serve` runs `pocketbase serve
   --publicDir ./build/dist --dir ./pb_data --hooksDir ./pb_hooks`.
-- Schema: `pb_migrations/` (PocketBase JS migrations, timestamped filenames).
-- Hooks: `pb_hooks/` (currently `keep_names.pb.js` rewrites uploaded
-  `originalName` → `name` on `games` create/update).
-- The `TRACKIFY_PB_TOKEN` in `.env` is a PocketBase auth JWT used by the web
-  app's PocketBase SDK client (loaded by Vite, not by Node tooling).
+- The `TRACKIFY_PB_TOKEN` in `.env` is a PocketBase auth JWT used by
+  the web app's PocketBase SDK client (loaded by Vite, not by Node
+  tooling).
 
 ## Docker / deploy
 
-- `Dockerfile` extends `adrianmusante/pocketbase`, copies `build/dist/` →
-  `/pocketbase/public/`, `pb_migrations/` → `/pocketbase/migrations/`,
-  `pb_hooks/` → `/pocketbase/hooks/`. Build the static site first with
-  `npm run build` before building the image.
-- `publish.sh <version>` is the release entry point: builds the image via
-  `docker buildx` for `linux/amd64` and pushes to
-  `harbor.alexklingenbeck.de/my/trackify:<version>`. Requires `set -e` and
-  the version arg.
+`Dockerfile` extends `adrianmusante/pocketbase`, copies `build/dist/`
+→ `/pocketbase/public/`, `pb_migrations/` → `/pocketbase/migrations/`,
+`pb_hooks/` → `/pocketbase/hooks/`. Build the static site first with
+`npm run build` before building the image. `publish.sh <version>` is
+the release entry point: builds the image via `docker buildx` for
+`linux/amd64` and pushes to
+`harbor.alexklingenbeck.de/my/trackify:<version>`. Requires `set -e`
+and the version arg.
+
+Full reference (build context, base-image assumptions, runtime data
+persistence, release checklist) lives in [`docs/deploy.md`](docs/deploy.md).
 
 ## Conventions worth knowing
 
 - No test framework, linter, or formatter is configured — do not introduce
   one without being asked. The `tools/*.mjs` scripts are CLI utilities, not
-  tests; they `process.exit(1)` on failure.
+  tests; they `process.exit(1)` on failure. Per-script reference (purpose,
+  env vars, direct invocation) lives in `docs/tools.md`.
+- PocketBase schema, fields, and API rules live in `docs/database.md`. Keep it
+  in sync when adding / renaming collections, changing fields, or modifying
+  rules in `pb_migrations/`.
 - `tools/prepare-web-assets.mjs` and `tools/verify-build-output.mjs` each
   hardcode the list of required runtime files. Update **both** when adding a
-  new backend.
+  new backend. The "Adding a new backend" and "Adding a new tool" sections
+  of the relevant doc spell out where to look.
 - `sample-files/` is reference data, not a staged web asset. It is scanned
   by `tools/generate-sample-index.mjs` to produce `sample-files/index.json`
   and `sample-files/games.json`; the latter is consumed by
   `tools/fetch-missing-cover-art.mjs` (Wikipedia summary → MediaWiki
-  page-image → infobox scrape; tunables documented in `README.md`).
+  page-image → infobox scrape; tunables documented in `docs/tools.md`).
 - `patches/` is intentionally for non-upstream files that override the
   matched submodule paths at build time. Do not modify submodule contents.
 - `vite.config.mjs` sets `emptyOutDir: !isWatchBuild` so `vite build
