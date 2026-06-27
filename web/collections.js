@@ -10,6 +10,7 @@
  */
 
 import { createFrameBroker } from './broker.js';
+import { createNavClient, IFRAME_POPSTATE_TOPIC } from './nav_client.js';
 
 const VALID_COLLECTION_TYPES = new Set(['games', 'playlists', 'platforms', 'artists']);
 const DEFAULT_TYPE = 'games';
@@ -30,6 +31,8 @@ const broker = createFrameBroker({
     requestTimeoutMs: 4000,
     allowedOrigins: [window.location.origin],
 });
+
+const navClient = createNavClient({ broker });
 
 const stores = {
     games: [],
@@ -256,8 +259,7 @@ function handlePlayAction(event, item) {
 /* ── Games-specific actions ── */
 
 function openPlaylist(gameId) {
-    const target = '/playlist.html#?game=' + encodeURIComponent(gameId);
-    window.location.assign(target);
+    navClient.navigate('/games/' + encodeURIComponent(gameId));
 }
 
 async function playGame(game) {
@@ -311,18 +313,17 @@ async function playGame(game) {
 
 function openPlaylistView(playlistId) {
     if (typeof playlistId !== 'string' || !playlistId.trim()) return;
-    const target = '/playlist.html#?playlist&id=' + encodeURIComponent(playlistId.trim());
-    window.location.assign(target);
+    navClient.navigate('/playlists/' + encodeURIComponent(playlistId.trim()));
 }
 
 function browsePlatformGames(item) {
     const name = itemTitle(item);
-    window.location.assign('/collections.html#?type=games&platform=' + encodeURIComponent(name));
+    navClient.navigate('/platforms/' + encodeURIComponent(name));
 }
 
 function browseArtistTracks(item) {
     const name = itemTitle(item);
-    window.location.assign('/playlist.html#?artist=' + encodeURIComponent(name));
+    navClient.navigate('/artists/' + encodeURIComponent(name));
 }
 
 /* ── Header update ── */
@@ -545,9 +546,34 @@ function applyRoute() {
 
 function init() {
     broker.start();
+    navClient.bindLinks();
     updateHeader();
     updateHero();
     setStatus('Waiting for library...');
+
+    console.info('[trace][iframe:games] init', {
+        href: window.location.href,
+        historyLength: window.history.length,
+        historyState: window.history.state,
+    });
+
+    window.addEventListener('popstate', () => {
+        console.info('[trace][iframe:games] popstate fired', {
+            href: window.location.href,
+            historyLength: window.history.length,
+        });
+        broker.publish(IFRAME_POPSTATE_TOPIC, {
+            href: window.location.href,
+            serviceId: 'games',
+        });
+    });
+
+    window.addEventListener('hashchange', () => {
+        console.info('[trace][iframe:games] hashchange fired', {
+            href: window.location.href,
+            historyLength: window.history.length,
+        });
+    });
 
     window.addEventListener('hashchange', applyRoute);
     applyRoute();

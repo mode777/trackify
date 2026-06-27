@@ -8,6 +8,7 @@
 'use strict';
 
 import { createFrameBroker } from './broker.js';
+import { createNavClient, IFRAME_POPSTATE_TOPIC } from './nav_client.js';
 
 import { els } from './playlist/dom.js';
 import { setStatus } from './playlist/status_ui.js';
@@ -65,6 +66,8 @@ const broker = createFrameBroker({
     requestTimeoutMs: 4000,
     allowedOrigins: [window.location.origin],
 });
+
+const navClient = createNavClient({ broker });
 
 function handleUserToggleFavorite(trackId, wasFavorite) {
     applyUserToggle(trackId, wasFavorite);
@@ -183,6 +186,7 @@ function init() {
     bindPlayUi();
 
     broker.start();
+    navClient.bindLinks();
 
     initNavigation({
         shellClient,
@@ -194,6 +198,30 @@ function init() {
 
     setStatus('Waiting for library...');
     queryAuthUser(shellClient);
+
+    console.info('[trace][iframe:playlist] init', {
+        href: window.location.href,
+        historyLength: window.history.length,
+        historyState: window.history.state,
+    });
+
+    window.addEventListener('popstate', () => {
+        console.info('[trace][iframe:playlist] popstate fired', {
+            href: window.location.href,
+            historyLength: window.history.length,
+        });
+        broker.publish(IFRAME_POPSTATE_TOPIC, {
+            href: window.location.href,
+            serviceId: 'playlist',
+        });
+    });
+
+    window.addEventListener('hashchange', () => {
+        console.info('[trace][iframe:playlist] hashchange fired', {
+            href: window.location.href,
+            historyLength: window.history.length,
+        });
+    });
 }
 
 if (document.readyState === 'loading') {

@@ -20,11 +20,11 @@
         </div>
 
         <nav class="sidebar-nav" aria-label="Main navigation">
-            <a class="active" href="/collections.html#?type=games" target="content-frame"><span class="material-symbols-outlined">sports_esports</span>Games</a>
-            <a href="/collections.html#?type=playlists" target="content-frame"><span class="material-symbols-outlined">queue_music</span>Playlists</a>
-            <a href="/collections.html#?type=platforms" target="content-frame"><span class="material-symbols-outlined">layers</span>Platforms</a>
-            <a href="/collections.html#?type=artists" target="content-frame"><span class="material-symbols-outlined">person</span>Artists</a>
-            <a href="/collections.html#?type=playlists&playlistType=private" target="content-frame" data-auth-required hidden><span class="material-symbols-outlined">library_music</span>My Library</a>
+            <a class="active" href="/games" data-router-link data-route="/games"><span class="material-symbols-outlined">sports_esports</span>Games</a>
+            <a href="/playlists" data-router-link data-route="/playlists"><span class="material-symbols-outlined">queue_music</span>Playlists</a>
+            <a href="/platforms" data-router-link data-route="/platforms"><span class="material-symbols-outlined">layers</span>Platforms</a>
+            <a href="/artists" data-router-link data-route="/artists"><span class="material-symbols-outlined">person</span>Artists</a>
+            <a href="/my-library" data-router-link data-route="/my-library" data-auth-required hidden><span class="material-symbols-outlined">library_music</span>My Library</a>
         </nav>
 
         <button class="create-btn" type="button" data-auth-required hidden>
@@ -42,10 +42,10 @@
         <header class="top-bar">
             <div class="top-left">
                 <div class="history-buttons">
-                    <button type="button" data-history-action="back" aria-label="Go back">
+                    <button type="button" data-history-action="back" aria-label="Go back" disabled>
                         <span class="material-symbols-outlined">chevron_left</span>
                     </button>
-                    <button type="button" data-history-action="forward" aria-label="Go forward">
+                    <button type="button" data-history-action="forward" aria-label="Go forward" disabled>
                         <span class="material-symbols-outlined">chevron_right</span>
                     </button>
                 </div>
@@ -70,7 +70,7 @@
         </header>
 
         <main class="content-area">
-            <iframe id="playlistFrame" class="content-frame" name="content-frame" title="Content Frame" src="/collections.html#?type=games" loading="eager"></iframe>
+            <iframe id="playlistFrame" class="content-frame" title="Content Frame" loading="eager"></iframe>
         </main>
     </div>
 

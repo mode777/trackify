@@ -206,6 +206,8 @@ The actual topic traffic, organized by direction:
 | `playlist.unliked`          | event  | user removed a track from favorites                |
 | `shell.user.login`          | event  | PocketBase auth state became valid                 |
 | `shell.user.logout`         | event  | PocketBase auth state became invalid               |
+| `shell.navigation.requested`| event  | frame requests a shell-side navigation (see [`docs/frontend.md`](frontend.md#7-router-and-data-router-link)) |
+| `shell.iframe.popstate`     | event  | a content frame's `popstate` fired (browser back/forward targeted the iframe instead of the shell); payload `{ href, serviceId }` — the shell reverse-matches the iframe URL to a shell URL via `Router#findShellUrlForIframe` and `router.navigate(shellUrl, { replace: true })` |
 
 ## 7. `playlist.selected` payload
 
@@ -300,6 +302,61 @@ Failures reject with a `request_failed` error whose `message` is
 `'Playlist not found'`, `'Title cannot be empty'`, `'Title is reserved'`,
 `'Invalid playlist color'`, `'Invalid playlist icon'`, `'Invalid playlist type'`,
 or `'Failed to update playlist'` depending on the failure mode.
+
+## 7.3. `shell.navigation.requested` payload
+
+Frames publish this event to ask the shell's `Router`
+(`web/router.js`) to navigate. The shell resolves the URL against its
+registered route table, pushes history, and drives the
+`#playlistFrame` swap (see
+[`docs/frontend.md`](frontend.md#7-router-and-data-router-link)).
+Frames never call `window.location.assign` directly.
+
+```ts
+type NavigationRequestedPayload = {
+  request: string | NavigationToken;
+  options?: {
+    replace?: boolean;
+    meta?: Record<string, unknown>;
+  };
+};
+
+type NavigationToken =
+  | { token: 'back' }
+  | { token: 'forward' }
+  | { token: 'go'; delta: number };
+```
+
+A `string` request is a virtual shell URL (e.g. `/playlists/<id>`); a
+`NavigationToken` triggers a `history.back()` / `forward()` /
+`history.go(delta)` on the shell side. `meta` is forwarded to the
+router's `navigated` subscribers — it does not affect routing.
+
+Frames publish this event via `createNavClient({ broker })` from
+`web/nav_client.js`; the shell subscribes directly to the topic in
+`web/app.js#initRouter`.
+
+## 7.4. `shell.iframe.popstate` payload
+
+A content frame's `window.addEventListener('popstate', ...)` listener
+publishes this event whenever the iframe's session history changes —
+either because the user pressed browser back/forward targeting the
+iframe, or because the shell set `frame.src = ...` and the iframe's
+history gained an entry.
+
+```ts
+type IframePopstatePayload = {
+  href: string;          // frame.contentWindow.location.href at popstate time
+  serviceId: 'games' | 'playlist';  // which iframe sent it
+};
+```
+
+The shell reverse-matches `href` against the registered route table
+via `Router#findShellUrlForIframe` (see
+[`docs/router.md` §6](router.md#6-iframe-navigation-sync)) and
+`replaceState`s the shell so the address bar follows the iframe.
+Subscriber lives in `web/app.js#initRouter`; the frame-side listener
+lives in `web/collections.js` and `web/playlist.js`.
 
 ## 8. Adding a new topic
 

@@ -150,9 +150,95 @@ WASM rebuild cost is meaningful (a few minutes cold), so prefer
 reference (purpose, env vars, exit codes) is in
 [`docs/tools.md`](tools.md).
 
-## 7. Adding a new page or service
+## 7. Router and `data-router-link`
 
-When adding a new HTML entry point or a new iframe service:
+The shell runs a small in-house `Router` (`web/router.js`) that owns the
+top-level URL (`window.location.pathname` + `window.location.search`).
+Content frames never call `window.location.assign` or set
+`window.location.hash` directly — every navigation in the app goes
+through the router, including in-iframe clicks.
+
+This section is the overview; the full reference (public API, pattern
+syntax, event surface, iframe sync, and known pitfalls) lives in
+[`docs/router.md`](router.md).
+
+The shape of a request:
+
+1. A click on `<a data-router-link href="/playlists/abc123">` (anywhere
+   in the DOM — shell sidebar, content frame, anywhere) is intercepted
+   by the frame-side `createNavClient({ broker })` helper
+   (`web/nav_client.js`). The helper publishes
+   `shell.navigation.requested` to the broker with the href.
+2. The shell's `Router` resolves the URL against its registered route
+   table. A route's `target` describes the iframe `src` it maps to
+   (e.g. `/playlist.html` + `hash: '?type=playlist&id=<id>'`).
+3. On match, the router `history.pushState`s the URL into the shell's
+   history and emits `navigated`. The shell's `navigated` subscriber
+   sets `#playlistFrame.src` to the resolved target HTML + hash.
+4. The iframe loads with the new hash. The iframe's own hash parser
+   (`web/playlist/navigation.js`, `collections.js#applyRoute`) reacts
+   to the resulting `hashchange` and renders accordingly.
+
+The router emits three events: `navigationStart` (before
+`pushState`), `navigated` (after, with the `RouteMatch`), and
+`navigationError` (no match). Unmatched paths currently `console.error`
+only — there is no fallback route in iteration 1.
+
+### Route template syntax
+
+- `/playlists` — static path.
+- `/playlists/<id>` — bracket params; matched positionally and passed
+  to `target.hash` substitutions (e.g. `hash: '?type=playlist&id=<id>'`).
+- The query string is preserved on the match but not part of the pattern.
+
+### Broker topic
+
+| Topic                          | Direction | Payload                                                  |
+| ------------------------------ | --------- | -------------------------------------------------------- |
+| `shell.navigation.requested`   | frame → shell | `{ request: string \| NavigationToken; options?: { replace?, meta? } }` |
+
+Where `NavigationToken` is `{ token: 'back' \| 'forward' \| 'go', delta? }`.
+Documented in [`docs/ui.md`](ui.md) §6.
+
+### Wiring at a glance
+
+- Shell (`web/app.js`): construct the router, subscribe to
+  `shell.navigation.requested`, set `#playlistFrame.src` from
+  `navigated`, and call `navClient.bindLinks(document.querySelector('.sidebar'))`.
+- Content frames (`web/playlist.js`, `web/collections.js`):
+  `createNavClient({ broker }).bindLinks()` next to the broker
+  setup.
+- Sidebar links in `web/index.html` carry `data-router-link` and
+  `data-route`. The `data-route` value is matched exactly against
+  `RouteMatch.pattern` by `syncSidebarActiveState` to drive the
+  `.active` class.
+
+## 8. Adding a new page or service
+
+## 8. Adding a new page or service
+
+### Adding a new shell-side route
+
+1. Pick a path and a target. The target's `html` is the iframe
+   `src` (e.g. `/playlist.html`); the optional `hash` is appended as
+   `html + '#' + hash` and supports `<param>` substitution. Full pattern
+   syntax is in [`docs/router.md` §3](router.md#3-pattern-syntax).
+2. Register the route in `web/app.js#registerRoutes()`:
+   ```js
+   router.register('/playlists/<id>', {
+       target: { html: '/playlist.html', hash: '?type=playlist&id=<id>' },
+   });
+   ```
+3. Add a sidebar link (or any link) with
+   `href="/playlists/<id>" data-router-link data-route="/playlists/<id>"`.
+4. Add a row for the iframe hash to the frame's internal hash
+   parser (`web/playlist/navigation.js` or
+   `collections.js#applyRoute`) if it is not already covered.
+5. The reverse matcher (`Router#findShellUrlForIframe` —
+   [`docs/router.md` §6](router.md#6-iframe-navigation-sync)) picks the
+   new route up automatically from the registered target.
+
+### Adding a new iframe service
 
 1. Add the new `.html` under `web/` (it must live next to `index.html`
    for Vite to pick it up as an entry).

@@ -10,6 +10,8 @@
 import PocketBase from 'pocketbase';
 import { createShellBroker } from './broker.js';
 import { ShellCatalogService } from './catalog_service.js';
+import { createRouter } from './router.js';
+import { createNavClient, NAVIGATION_REQUESTED_TOPIC, IFRAME_POPSTATE_TOPIC } from './nav_client.js';
 
 const shellBroker = createShellBroker({
     serviceId: 'shell',
@@ -33,115 +35,11 @@ const authUiState = {
     wasValid: false,
 };
 
-function createIframeHistoryTracker(contentFrame) {
-    const state = {
-        entries: [],
-        index: -1,
-    };
-
-    function currentUrl() {
-        if (!contentFrame || !contentFrame.contentWindow) return '';
-        try {
-            return contentFrame.contentWindow.location.href;
-        } catch (_error) {
-            return '';
-        }
-    }
-
-    function recordCurrentEntry() {
-        const url = currentUrl();
-        if (!url) return;
-
-        if (state.index < 0) {
-            state.entries = [url];
-            state.index = 0;
-            return;
-        }
-
-        if (state.entries[state.index] === url) {
-            return;
-        }
-
-        if (state.index > 0 && state.entries[state.index - 1] === url) {
-            state.index -= 1;
-            return;
-        }
-
-        if (state.index < state.entries.length - 1 && state.entries[state.index + 1] === url) {
-            state.index += 1;
-            return;
-        }
-
-        state.entries = state.entries.slice(0, state.index + 1);
-        state.entries.push(url);
-        state.index += 1;
-    }
-
-    function canGoBack() {
-        return state.index > 0;
-    }
-
-    function canGoForward() {
-        return state.index >= 0 && state.index < state.entries.length - 1;
-    }
-
-    return {
-        recordCurrentEntry,
-        canGoBack,
-        canGoForward,
-    };
-}
-
 function bindHistoryButtons() {
     const backButton = document.querySelector('[data-history-action="back"]');
     const forwardButton = document.querySelector('[data-history-action="forward"]');
-    const contentFrame = document.getElementById('playlistFrame');
-    if (!backButton || !forwardButton) return;
-
-    const iframeTracker = createIframeHistoryTracker(contentFrame);
-
-    const updateHistoryButtons = () => {
-        iframeTracker.recordCurrentEntry();
-        backButton.disabled = !iframeTracker.canGoBack();
-        forwardButton.disabled = !iframeTracker.canGoForward();
-    };
-
-    const goBack = () => {
-        if (contentFrame && contentFrame.contentWindow) {
-            try {
-                contentFrame.contentWindow.history.back();
-                return;
-            } catch (_error) {
-                // Fall back to top-level history if iframe history is inaccessible.
-            }
-        }
-        window.history.back();
-    };
-
-    const goForward = () => {
-        if (contentFrame && contentFrame.contentWindow) {
-            try {
-                contentFrame.contentWindow.history.forward();
-                return;
-            } catch (_error) {
-                // Fall back to top-level history if iframe history is inaccessible.
-            }
-        }
-        window.history.forward();
-    };
-
-    backButton.addEventListener('click', goBack);
-    forwardButton.addEventListener('click', goForward);
-
-    if (contentFrame) {
-        contentFrame.addEventListener('load', updateHistoryButtons);
-    }
-
-    window.addEventListener('popstate', updateHistoryButtons);
-    window.addEventListener('pageshow', updateHistoryButtons);
-    window.addEventListener('hashchange', updateHistoryButtons);
-
-    updateHistoryButtons();
+    if (backButton) backButton.disabled = true;
+    if (forwardButton) forwardButton.disabled = true;
 }
 
 function makeAuthUserPayload() {
@@ -491,20 +389,7 @@ function initBroker() {
 
 function navigateContentFrameToPlaylist(playlistId) {
     if (typeof playlistId !== 'string' || !playlistId.trim()) return;
-    const contentFrame = document.getElementById('playlistFrame');
-    if (!contentFrame || !contentFrame.contentWindow) return;
-    const targetUrl = '/playlist.html#?playlist&id=' + encodeURIComponent(playlistId.trim());
-    try {
-        contentFrame.contentWindow.location.assign(targetUrl);
-        return;
-    } catch (_error) {
-        // Fall back to setting src if the iframe window is inaccessible.
-    }
-    try {
-        contentFrame.src = targetUrl;
-    } catch (_error) {
-        // Give up silently; the user can still navigate manually.
-    }
+    navClient.navigate('/playlists/' + encodeURIComponent(playlistId.trim()));
 }
 
 function bindCreatePlaylistButton() {
@@ -523,6 +408,152 @@ function bindCreatePlaylistButton() {
     });
 }
 
+const router = createRouter({
+    notFoundHandler: (url) => {
+        console.error('[router] no route matched', url);
+    },
+});
+
+const navClient = createNavClient({ broker: shellBroker });
+
+function syncSidebarActiveState(routeMatch) {
+    const links = document.querySelectorAll('.sidebar-nav a[data-route]');
+    const activePattern = routeMatch && typeof routeMatch.pattern === 'string' ? routeMatch.pattern : '';
+    for (const link of links) {
+        const target = link.getAttribute('data-route');
+        link.classList.toggle('active', Boolean(activePattern) && target === activePattern);
+    }
+}
+
+function applyRouteToContentFrame(routeMatch) {
+    const frame = document.getElementById('playlistFrame');
+    if (!frame || !routeMatch || !routeMatch.target) return;
+    const html = routeMatch.target.html || '';
+    if (!html) return;
+    const hash = routeMatch.target.hash || '';
+    const next = hash ? html + '#' + hash : html;
+    let nextHref = next;
+    try {
+        nextHref = new URL(next, window.location.origin).href;
+    } catch (_error) {
+    }
+    let currentHref = '';
+    let iframeHistoryLength = null;
+    try {
+        if (frame.contentWindow && frame.contentWindow.location) {
+            currentHref = frame.contentWindow.location.href;
+            iframeHistoryLength = frame.contentWindow.history ? frame.contentWindow.history.length : null;
+        }
+    } catch (_error) {
+    }
+    console.info('[trace][shell] applyRouteToContentFrame', {
+        to: routeMatch.url,
+        next,
+        nextHref,
+        currentHref,
+        frameSrc: frame.src,
+        iframeHistoryLength,
+        shellHistoryLength: window.history ? window.history.length : null,
+    });
+    if (currentHref && currentHref === nextHref) return;
+    try {
+        frame.src = next;
+    } catch (_error) {
+    }
+}
+
+function registerRoutes() {
+    router.register('/games', {
+        target: { html: '/collections.html', hash: '?type=games' },
+    });
+    router.register('/games/<id>', {
+        target: { html: '/playlist.html', hash: '?game=<id>' },
+    });
+    router.register('/playlists', {
+        target: { html: '/collections.html', hash: '?type=playlists' },
+    });
+    router.register('/playlists/<id>', {
+        target: { html: '/playlist.html', hash: '?playlist&id=<id>' },
+    });
+    router.register('/artists', {
+        target: { html: '/collections.html', hash: '?type=artists' },
+    });
+    router.register('/artists/<name>', {
+        target: { html: '/playlist.html', hash: '?artist=<name>' },
+    });
+    router.register('/platforms', {
+        target: { html: '/collections.html', hash: '?type=platforms' },
+    });
+    router.register('/platforms/<name>', {
+        target: { html: '/collections.html', hash: '?type=games&platform=<name>' },
+    });
+    router.register('/favorites', {
+        target: { html: '/playlist.html', hash: '?favorites' },
+    });
+    router.register('/my-library', {
+        target: { html: '/collections.html', hash: '?type=playlists&playlistType=private' },
+    });
+}
+
+function initRouter() {
+    registerRoutes();
+
+    router.subscribe('navigated', ({ to }) => {
+        syncSidebarActiveState(to);
+        applyRouteToContentFrame(to);
+    });
+
+    shellBroker.subscribe(NAVIGATION_REQUESTED_TOPIC, ({ payload }) => {
+        const request = payload && payload.request;
+        const options = payload && payload.options ? payload.options : {};
+        router.navigate(request, options).catch((error) => {
+            console.error('[router] navigation request failed', error);
+        });
+    });
+
+    shellBroker.subscribe(IFRAME_POPSTATE_TOPIC, ({ payload }) => {
+        const href = payload && payload.href;
+        if (typeof href !== 'string' || !href) return;
+        const shellUrl = router.findShellUrlForIframe(href);
+        console.info('[trace][shell] iframe popstate', {
+            href,
+            resolvedShellUrl: shellUrl,
+            currentShellUrl: router.currentRoute() ? router.currentRoute().url : null,
+        });
+        if (!shellUrl) return;
+        const current = router.currentRoute();
+        if (current && current.url === shellUrl) return;
+        router.navigate(shellUrl, { replace: true }).catch((error) => {
+            console.error('[router] iframe popstate navigation failed', error);
+        });
+    });
+
+    const sidebar = document.querySelector('.sidebar');
+    navClient.bindLinks(sidebar || document);
+
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+        window.history.replaceState({}, '', '/games');
+    }
+
+    console.info('[trace][shell] initRouter', {
+        pathname: window.location.pathname,
+        href: window.location.href,
+        shellHistoryLength: window.history.length,
+        iframeHasSrc: !!document.getElementById('playlistFrame').src,
+    });
+
+    window.addEventListener('popstate', () => {
+        console.info('[trace][shell] native popstate fired', {
+            pathname: window.location.pathname,
+            href: window.location.href,
+            shellHistoryLength: window.history.length,
+        });
+    });
+
+    router.start();
+    syncSidebarActiveState(router.currentRoute());
+}
+
 function init() {
     catalogService.preload();
     bindAuthUi();
@@ -531,6 +562,7 @@ function init() {
     bindShellMediaSessionHandlers();
     bindMediaKeyFallback();
     initBroker();
+    initRouter();
     if(pb.authStore.isValid) {
         setTimeout(() => {
             publishAuthLifecycleEvent('shell.user.login');
