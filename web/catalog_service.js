@@ -101,6 +101,47 @@ export class ShellCatalogService {
         return this.parsePlaylistsManifest([record])[0];
     }
 
+    async updatePlaylist(id, updates) {
+        if (typeof id !== 'string' || !id.trim()) {
+            throw new Error('Missing playlist id');
+        }
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+        if (!updates || typeof updates !== 'object') {
+            throw new Error('Missing playlist updates');
+        }
+
+        const payload = {};
+        if (Object.prototype.hasOwnProperty.call(updates, 'title')) {
+            if (typeof updates.title !== 'string') {
+                throw new Error('Invalid playlist title');
+            }
+            const trimmedTitle = updates.title.trim();
+            if (!trimmedTitle) {
+                throw new Error('Title cannot be empty');
+            }
+            if (trimmedTitle === '__fav__') {
+                throw new Error('Title is reserved');
+            }
+            payload.title = trimmedTitle;
+        }
+
+        if (!Object.keys(payload).length) {
+            throw new Error('No supported playlist updates provided');
+        }
+
+        try {
+            const record = await this.pb.collection(PLAYLISTS_COLLECTION).update(id.trim(), payload);
+            return this.parsePlaylistsManifest([record])[0];
+        } catch (error) {
+            console.error('Failed to update playlist', id, error);
+            const isNotFound = error && (error.status === 404 || error.code === 404);
+            const message = isNotFound ? 'Playlist not found' : 'Failed to update playlist';
+            throw new Error(message);
+        }
+    }
+
     async getOrCreateFavoritesPlaylist() {
         if (!this.pb.authStore.isValid) {
             throw new Error('User is not authenticated');
@@ -123,6 +164,77 @@ export class ShellCatalogService {
         }
         this.favoritesPlaylistCache = playlist;
         return playlist;
+    }
+
+    async addTrackToPlaylist(trackId, playlistId) {
+        if (typeof trackId !== 'string' || !trackId.trim()) {
+            throw new Error('Missing track id');
+        }
+        if (typeof playlistId !== 'string' || !playlistId.trim()) {
+            throw new Error('Missing playlist id');
+        }
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+
+        try {
+            return await this.pb.collection(PLAYLIST_TRACKS_COLLECTION).create({
+                track: trackId.trim(),
+                playlist: playlistId.trim(),
+            });
+        } catch (error) {
+            console.error('Failed to add track to playlist', trackId, playlistId, error);
+            throw new Error('Failed to add track to playlist');
+        }
+    }
+
+    async removeTrackFromPlaylist(trackId, playlistId) {
+        if (typeof trackId !== 'string' || !trackId.trim()) {
+            throw new Error('Missing track id');
+        }
+        if (typeof playlistId !== 'string' || !playlistId.trim()) {
+            throw new Error('Missing playlist id');
+        }
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+
+        try {
+            const filter = `track="${trackId.trim()}" && playlist="${playlistId.trim()}"`;
+            const records = await this.pb.collection(PLAYLIST_TRACKS_COLLECTION).getFullList({ filter });
+            for (const record of records) {
+                if (record && typeof record.id === 'string') {
+                    await this.pb.collection(PLAYLIST_TRACKS_COLLECTION).delete(record.id);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to remove track from playlist', trackId, playlistId, error);
+            throw new Error('Failed to remove track from playlist');
+        }
+    }
+
+    async queryPlaylistsForTrack(trackId) {
+        if (typeof trackId !== 'string' || !trackId.trim()) {
+            throw new Error('Missing track id');
+        }
+        if (!this.pb.authStore.isValid) {
+            throw new Error('User is not authenticated');
+        }
+
+        const userId = this.pb.authStore.record.id;
+        const trimmedTrackId = trackId.trim();
+
+        try {
+            const filter = `track="${trimmedTrackId}" && playlist.user.id="${userId}"`;
+            const records = await this.pb.collection(PLAYLIST_TRACKS_COLLECTION).getFullList({ filter });
+            const playlistIds = records
+                .map((record) => record && typeof record.playlist === 'string' ? record.playlist : '')
+                .filter((id) => typeof id === 'string' && id.trim());
+            return Array.from(new Set(playlistIds));
+        } catch (error) {
+            console.error('Failed to load playlists for track', trimmedTrackId, error);
+            throw new Error('Failed to load playlists for track');
+        }
     }
 
     async queryIndex(filters) {
@@ -152,8 +264,20 @@ export class ShellCatalogService {
             ? filters.type.trim().toLowerCase()
             : 'public';
 
+        if (typeFilter === 'own') {
+            if (!this.pb.authStore.isValid) {
+                throw new Error('User is not authenticated');
+            }
+        }
+
         try {
-            const filter = `type="${typeFilter}"`;
+            let filter;
+            if (typeFilter === 'own') {
+                const userId = this.pb.authStore.record.id;
+                filter = `user="${userId}"`;
+            } else {
+                filter = `type="${typeFilter}"`;
+            }
             const records = await this.pb.collection(PLAYLISTS_COLLECTION).getFullList({ filter });
             const playlists = this.parsePlaylistsManifest(records);
             return this.makePlaylistsPayload(playlists);
@@ -372,6 +496,7 @@ export class ShellCatalogService {
             id: typeof entry.id === 'string' ? entry.id : '',
             title: typeof entry.title === 'string' ? entry.title.trim() : '',
             type: typeof entry.type === 'string' ? entry.type : '',
+            userId: typeof entry.user === 'string' ? entry.user : '',
         }));
     }
 

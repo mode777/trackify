@@ -16,6 +16,7 @@ const els = {
     heroArt: document.querySelector('.hero-art'),
     heroEyebrow: document.getElementById('heroEyebrow'),
     heroTitle: document.getElementById('heroTitle'),
+    heroEditButton: document.getElementById('heroEditButton'),
     heroCompany: document.getElementById('heroCompany'),
     heroYear: document.getElementById('heroYear'),
     heroMetaDot: document.getElementById('heroMetaDot'),
@@ -36,7 +37,11 @@ let currentIndex = -1;
 let playerReady = false;
 let pendingSelection = null;
 let playlistInfo = {};
+let currentPlaylist = null;
+let currentUser = null;
 let favoriteTrackIds = new Set();
+let openAddPopup = null;
+let titleEditInFlight = false;
 
 function updateHeroArt(coverArt) {
     if (!els.heroArt) return;
@@ -110,25 +115,196 @@ function applyFavoritesHeroState() {
     if (els.heroCompany) els.heroCompany.textContent = 'Your favorite tracks';
     if (els.heroYear) els.heroYear.textContent = '';
     if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
+    currentPlaylist = null;
+    clearPlaylistEditState();
 }
 
 function applyPlaylistHeroState(playlist) {
     document.body.classList.add('is-playlist');
     document.body.classList.remove('is-favorites');
-    const title = playlist && typeof playlist.title === 'string' && playlist.title.trim()
-        ? playlist.title.trim()
-        : 'Playlist';
+    currentPlaylist = playlist && typeof playlist === 'object' && typeof playlist.id === 'string' && playlist.id
+        ? {
+            id: playlist.id,
+            title: typeof playlist.title === 'string' ? playlist.title.trim() : '',
+            type: typeof playlist.type === 'string' ? playlist.type : '',
+            userId: typeof playlist.userId === 'string' ? playlist.userId : '',
+        }
+        : null;
+    const title = currentPlaylist && currentPlaylist.title ? currentPlaylist.title : 'Playlist';
     if (els.heroEyebrow) els.heroEyebrow.textContent = 'Playlist';
     if (els.heroTitle) els.heroTitle.textContent = title;
-    if (els.heroCompany) els.heroCompany.textContent = playlist && playlist.type === 'public' ? 'Public playlist' : 'Curated tracks';
+    if (els.heroCompany) els.heroCompany.textContent = currentPlaylist && currentPlaylist.type === 'public' ? 'Public playlist' : 'Curated tracks';
     if (els.heroYear) els.heroYear.textContent = '';
     if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
+    applyPlaylistEditState();
+}
+
+function canEditCurrentPlaylist() {
+    if (!currentPlaylist || typeof currentPlaylist.id !== 'string' || !currentPlaylist.id) return false;
+    if (currentPlaylist.type === 'favorites') return false;
+    if (!currentUser || !currentUser.isAuthenticated || !currentUser.user || typeof currentUser.user.id !== 'string') return false;
+    return currentPlaylist.userId === currentUser.user.id;
+}
+
+function applyPlaylistEditState() {
+    const editable = canEditCurrentPlaylist();
+    if (document.body) {
+        document.body.classList.toggle('is-owner', editable);
+    }
+    if (els.heroTitle) {
+        els.heroTitle.classList.toggle('is-editable', editable);
+        if (editable) {
+            els.heroTitle.setAttribute('role', 'button');
+            els.heroTitle.setAttribute('tabindex', '0');
+            els.heroTitle.setAttribute('aria-label', 'Edit playlist title');
+        } else {
+            els.heroTitle.removeAttribute('role');
+            els.heroTitle.removeAttribute('tabindex');
+            els.heroTitle.removeAttribute('aria-label');
+        }
+    }
+    if (els.heroEditButton) {
+        els.heroEditButton.hidden = !editable;
+    }
+}
+
+function clearPlaylistEditState() {
+    if (els.heroTitle) {
+        els.heroTitle.classList.remove('is-editable');
+        els.heroTitle.removeAttribute('role');
+        els.heroTitle.removeAttribute('tabindex');
+        els.heroTitle.removeAttribute('aria-label');
+    }
+    if (els.heroEditButton) {
+        els.heroEditButton.hidden = true;
+    }
+    if (document.body) {
+        document.body.classList.remove('is-owner');
+    }
+}
+
+function isTitleEditing() {
+    return Boolean(els.heroTitle && els.heroTitle.querySelector('input.hero-title-edit'));
+}
+
+function cancelTitleEdit() {
+    if (!els.heroTitle) return;
+    const input = els.heroTitle.querySelector('input.hero-title-edit');
+    if (!input) return;
+    const original = currentPlaylist && typeof currentPlaylist.title === 'string' ? currentPlaylist.title : '';
+    els.heroTitle.textContent = original || 'Playlist';
+    els.heroTitle.classList.remove('is-editable');
+    applyPlaylistEditState();
+}
+
+function startTitleEdit() {
+    if (!canEditCurrentPlaylist() || titleEditInFlight) return;
+    if (!els.heroTitle) return;
+    if (isTitleEditing()) return;
+
+    const originalTitle = currentPlaylist && typeof currentPlaylist.title === 'string' ? currentPlaylist.title : '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'hero-title-edit';
+    input.value = originalTitle;
+    input.setAttribute('aria-label', 'Playlist title');
+    input.maxLength = 200;
+    input.spellcheck = false;
+
+    els.heroTitle.textContent = '';
+    els.heroTitle.appendChild(input);
+    els.heroTitle.classList.add('is-editable');
+    if (els.heroEditButton) {
+        els.heroEditButton.hidden = true;
+    }
+
+    input.focus();
+    input.select();
+
+    let resolved = false;
+
+    const restoreDisplay = (nextTitle) => {
+        els.heroTitle.textContent = nextTitle;
+    };
+
+    const commit = async () => {
+        if (resolved) return;
+        resolved = true;
+        const nextTitle = input.value.trim();
+        if (!nextTitle) {
+            restoreDisplay(originalTitle);
+            applyPlaylistEditState();
+            setStatus('Playlist title cannot be empty');
+            return;
+        }
+        if (nextTitle === originalTitle) {
+            restoreDisplay(originalTitle);
+            applyPlaylistEditState();
+            return;
+        }
+        titleEditInFlight = true;
+        setStatus('Saving playlist title...');
+        try {
+            const updated = await broker.request('shell.updatePlaylist', {
+                id: currentPlaylist.id,
+                updates: { title: nextTitle },
+            }, { target: 'shell', timeoutMs: 8000 });
+            const resolvedPlaylist = updated && typeof updated === 'object' ? updated : null;
+            const resolvedTitle = resolvedPlaylist && typeof resolvedPlaylist.title === 'string' && resolvedPlaylist.title.trim()
+                ? resolvedPlaylist.title.trim()
+                : nextTitle;
+            currentPlaylist = {
+                ...(currentPlaylist || {}),
+                ...(resolvedPlaylist || {}),
+                id: currentPlaylist.id,
+                title: resolvedTitle,
+                type: resolvedPlaylist && resolvedPlaylist.type ? resolvedPlaylist.type : currentPlaylist.type,
+                userId: resolvedPlaylist && resolvedPlaylist.userId ? resolvedPlaylist.userId : currentPlaylist.userId,
+            };
+            restoreDisplay(resolvedTitle);
+            applyPlaylistEditState();
+            setStatus('Playlist title updated');
+        } catch (error) {
+            console.error('Failed to update playlist title', error);
+            restoreDisplay(originalTitle);
+            applyPlaylistEditState();
+            const message = error && error.message ? error.message : 'Failed to update playlist title';
+            setStatus(message);
+        } finally {
+            titleEditInFlight = false;
+        }
+    };
+
+    const onKeydown = (event) => {
+        if (!event) return;
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            input.removeEventListener('keydown', onKeydown);
+            commit();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            input.removeEventListener('keydown', onKeydown);
+            resolved = true;
+            cancelTitleEdit();
+        }
+    };
+
+    const onBlur = () => {
+        if (resolved) return;
+        input.removeEventListener('keydown', onKeydown);
+        commit();
+    };
+
+    input.addEventListener('keydown', onKeydown);
+    input.addEventListener('blur', onBlur);
 }
 
 function clearFavoritesHeroState() {
     document.body.classList.remove('is-favorites');
     document.body.classList.remove('is-playlist');
     if (els.heroEyebrow) els.heroEyebrow.textContent = 'Game';
+    currentPlaylist = null;
+    clearPlaylistEditState();
 }
 
 function setStatus(message) {
@@ -181,6 +357,20 @@ function renderTracks() {
 
         meta.append(name, game);
 
+        const addToPlaylist = document.createElement('button');
+        addToPlaylist.type = 'button';
+        addToPlaylist.className = 'track-add';
+        const addToPlaylistIcon = document.createElement('span');
+        addToPlaylistIcon.className = 'material-symbols-outlined';
+        addToPlaylistIcon.setAttribute('aria-hidden', 'true');
+        addToPlaylistIcon.textContent = 'add_circle';
+        addToPlaylist.append(addToPlaylistIcon);
+        addToPlaylist.setAttribute('aria-label', 'Add ' + track.title + ' to playlist');
+        addToPlaylist.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openAddToPlaylistPopup(addToPlaylist, track);
+        });
+
         const favorite = document.createElement('button');
         favorite.type = 'button';
         favorite.className = 'track-favorite';
@@ -201,7 +391,7 @@ function renderTracks() {
             refreshFavoriteIcons();
         });
 
-        main.append(meta, favorite);
+        main.append(meta, addToPlaylist, favorite);
 
         const badge = document.createElement('span');
         badge.className = 'badge';
@@ -235,6 +425,260 @@ function refreshFavoriteIcons() {
         if (!button) return;
         applyFavoriteState(button, track, favoriteTrackIds.has(track.id));
     });
+}
+
+function closeAddToPlaylistPopup() {
+    if (!openAddPopup) return;
+    const { popup, onDocClick, onKeydown, onWindowResize } = openAddPopup;
+    document.removeEventListener('mousedown', onDocClick, true);
+    document.removeEventListener('keydown', onKeydown, true);
+    window.removeEventListener('resize', onWindowResize);
+    if (popup && popup.parentNode) {
+        popup.parentNode.removeChild(popup);
+    }
+    openAddPopup = null;
+}
+
+function positionAddToPlaylistPopup(popup, anchor) {
+    const margin = 4;
+    const anchorRect = anchor.getBoundingClientRect();
+    const popupRect = popup.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let top;
+    let left;
+    let placement = 'bottom-right';
+
+    const fitsBelow = anchorRect.bottom + popupRect.height + margin <= viewportHeight;
+    const fitsAbove = anchorRect.top - popupRect.height - margin >= 0;
+    const fitsRight = anchorRect.right + popupRect.width + margin <= viewportWidth;
+    const fitsLeft = anchorRect.left - popupRect.width - margin >= 0;
+
+    if (fitsBelow) {
+        top = anchorRect.bottom + margin;
+    } else if (fitsAbove) {
+        top = anchorRect.top - popupRect.height - margin;
+        placement = 'top-right';
+    } else {
+        top = Math.max(margin, viewportHeight - popupRect.height - margin);
+    }
+
+    if (fitsRight) {
+        left = anchorRect.right + margin;
+    } else if (fitsLeft) {
+        left = anchorRect.left - popupRect.width - margin;
+        if (placement === 'bottom-right') placement = 'bottom-left';
+        else if (placement === 'top-right') placement = 'top-left';
+    } else {
+        left = Math.max(margin, viewportWidth - popupRect.width - margin);
+    }
+
+    left = Math.max(margin, Math.min(left, viewportWidth - popupRect.width - margin));
+    top = Math.max(margin, Math.min(top, viewportHeight - popupRect.height - margin));
+
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+    popup.dataset.placement = placement;
+}
+
+function renderAddToPlaylistList(listEl, playlists, popupState) {
+    listEl.innerHTML = '';
+    if (!playlists.length) {
+        const empty = document.createElement('div');
+        empty.className = 'add-popup-empty';
+        empty.textContent = 'No playlists yet. Create one to start collecting tracks.';
+        listEl.appendChild(empty);
+        return;
+    }
+    for (const playlist of playlists) {
+        const item = document.createElement('label');
+        item.className = 'add-popup-item';
+
+        const playlistId = typeof playlist.id === 'string' ? playlist.id : '';
+        const isMember = popupState && popupState.memberPlaylistIds
+            ? popupState.memberPlaylistIds.has(playlistId)
+            : false;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = playlistId;
+        checkbox.checked = isMember;
+        checkbox.addEventListener('change', () => {
+            handleAddToPlaylistCheckboxChange(checkbox, playlist, popupState);
+        });
+
+        const name = document.createElement('span');
+        name.className = 'add-popup-name';
+        const trimmedTitle = typeof playlist.title === 'string' ? playlist.title.trim() : '';
+        if (trimmedTitle === '__fav__') {
+            name.textContent = 'Liked Tracks';
+        } else {
+            name.textContent = trimmedTitle || 'Untitled playlist';
+        }
+
+        item.append(checkbox, name);
+        listEl.appendChild(item);
+    }
+}
+
+async function handleAddToPlaylistCheckboxChange(checkbox, playlist, popupState) {
+    if (!popupState || !popupState.track) return;
+    const trackId = popupState.track.id;
+    if (typeof trackId !== 'string' || !trackId) return;
+    const playlistId = typeof playlist.id === 'string' ? playlist.id : '';
+    if (!playlistId) return;
+
+    const shouldBeMember = checkbox.checked;
+    const isFavoritesPlaylist = typeof playlist.title === 'string' && playlist.title.trim() === '__fav__';
+
+    if (shouldBeMember) {
+        popupState.memberPlaylistIds.add(playlistId);
+    } else {
+        popupState.memberPlaylistIds.delete(playlistId);
+    }
+
+    if (isFavoritesPlaylist) {
+        if (shouldBeMember) {
+            favoriteTrackIds.add(trackId);
+        } else {
+            favoriteTrackIds.delete(trackId);
+        }
+        refreshFavoriteIcons();
+        if (shouldBeMember) {
+            broker.publish('playlist.liked', { trackId }, { target: 'shell' });
+        } else {
+            broker.publish('playlist.unliked', { trackId }, { target: 'shell' });
+        }
+        return;
+    }
+
+    try {
+        if (shouldBeMember) {
+            await broker.request('shell.addTrackToPlaylist', {
+                trackId,
+                playlistId,
+            }, { target: 'shell', timeoutMs: 4000 });
+        } else {
+            await broker.request('shell.removeTrackFromPlaylist', {
+                trackId,
+                playlistId,
+            }, { target: 'shell', timeoutMs: 4000 });
+        }
+    } catch (error) {
+        console.error('Failed to update playlist membership', error);
+        checkbox.checked = !shouldBeMember;
+        if (shouldBeMember) {
+            popupState.memberPlaylistIds.delete(playlistId);
+        } else {
+            popupState.memberPlaylistIds.add(playlistId);
+        }
+        if (isFavoritesPlaylist) {
+            if (shouldBeMember) {
+                favoriteTrackIds.delete(trackId);
+            } else {
+                favoriteTrackIds.add(trackId);
+            }
+            refreshFavoriteIcons();
+        }
+    }
+}
+
+async function openAddToPlaylistPopup(anchor, track) {
+    closeAddToPlaylistPopup();
+
+    const popup = document.createElement('div');
+    popup.className = 'add-popup';
+    popup.setAttribute('role', 'menu');
+    popup.setAttribute('aria-label', 'Add ' + track.title + ' to a playlist');
+
+    const header = document.createElement('div');
+    header.className = 'add-popup-header';
+    header.textContent = 'Add to playlist';
+    popup.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'add-popup-list';
+
+    const loading = document.createElement('div');
+    loading.className = 'add-popup-status';
+    loading.textContent = 'Loading playlists…';
+    list.appendChild(loading);
+    popup.appendChild(list);
+
+    document.body.appendChild(popup);
+    positionAddToPlaylistPopup(popup, anchor);
+
+    const onDocClick = (event) => {
+        if (!openAddPopup) return;
+        if (openAddPopup.popup.contains(event.target)) return;
+        if (event.target === anchor || anchor.contains(event.target)) return;
+        closeAddToPlaylistPopup();
+    };
+    const onKeydown = (event) => {
+        if (!event || event.key !== 'Escape') return;
+        event.preventDefault();
+        closeAddToPlaylistPopup();
+    };
+    const onWindowResize = () => {
+        if (!openAddPopup) return;
+        positionAddToPlaylistPopup(openAddPopup.popup, anchor);
+    };
+
+    document.addEventListener('mousedown', onDocClick, true);
+    document.addEventListener('keydown', onKeydown, true);
+    window.addEventListener('resize', onWindowResize);
+
+    const popupState = {
+        popup,
+        anchor,
+        onDocClick,
+        onKeydown,
+        onWindowResize,
+        track,
+        memberPlaylistIds: new Set(),
+    };
+    openAddPopup = popupState;
+
+    try {
+        const [playlistsResponse, memberResponse] = await Promise.all([
+            broker.request('shell.queryPlaylists', { type: 'own' }, {
+                target: 'shell',
+                timeoutMs: 4000,
+            }),
+            broker.request('shell.queryPlaylistsForTrack', { trackId: track.id }, {
+                target: 'shell',
+                timeoutMs: 4000,
+            }),
+        ]);
+        if (!openAddPopup || openAddPopup.popup !== popup) return;
+
+        const playlists = playlistsResponse && Array.isArray(playlistsResponse.playlists) ? playlistsResponse.playlists : [];
+        const errorMessage = playlistsResponse && typeof playlistsResponse.error === 'string' ? playlistsResponse.error : '';
+        const memberIds = Array.isArray(memberResponse) ? memberResponse : [];
+
+        if (errorMessage) {
+            const status = document.createElement('div');
+            status.className = 'add-popup-status';
+            status.textContent = 'Sign in to view your playlists.';
+            list.innerHTML = '';
+            list.appendChild(status);
+            return;
+        }
+
+        popupState.memberPlaylistIds = new Set(
+            memberIds.filter((id) => typeof id === 'string' && id)
+        );
+        renderAddToPlaylistList(list, playlists, popupState);
+        positionAddToPlaylistPopup(popup, anchor);
+    } catch (_error) {
+        if (!openAddPopup || openAddPopup.popup !== popup) return;
+        const status = document.createElement('div');
+        status.className = 'add-popup-status';
+        status.textContent = 'Sign in to view your playlists.';
+        list.innerHTML = '';
+        list.appendChild(status);
+    }
 }
 
 async function queryFavorites() {
@@ -477,6 +921,32 @@ function evaluateFragmentParameters() {
     }
 }
 
+function applyAuthUser(payload) {
+    if (!payload || typeof payload !== 'object') {
+        currentUser = null;
+    } else {
+        const isAuthenticated = payload.isAuthenticated === true;
+        const user = isAuthenticated && payload.user && typeof payload.user === 'object' ? payload.user : null;
+        currentUser = {
+            isAuthenticated,
+            user: user && typeof user.id === 'string' && user.id ? user : null,
+        };
+    }
+    applyPlaylistEditState();
+}
+
+async function queryAuthUser() {
+    try {
+        const payload = await broker.request('shell.queryUser', null, {
+            target: 'shell',
+            timeoutMs: 4000,
+        });
+        applyAuthUser(payload);
+    } catch (_error) {
+        applyAuthUser(null);
+    }
+}
+
 function bindBrokerHandlers() {
     broker.subscribe('player.ready', () => {
         playerReady = true;
@@ -506,6 +976,14 @@ function bindBrokerHandlers() {
             }
         }
     });
+
+    broker.subscribe('shell.user.login', ({ payload }) => {
+        applyAuthUser(payload);
+    });
+
+    broker.subscribe('shell.user.logout', ({ payload }) => {
+        applyAuthUser(payload);
+    });
 }
 
 function bindUiHandlers() {
@@ -516,6 +994,36 @@ function bindUiHandlers() {
     if (els.heroArt) {
         els.heroArt.addEventListener('click', playCurrentSelection);
     }
+
+    if (els.heroEditButton) {
+        els.heroEditButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            startTitleEdit();
+        });
+    }
+
+    if (els.heroTitle) {
+        els.heroTitle.addEventListener('click', () => {
+            if (canEditCurrentPlaylist()) {
+                startTitleEdit();
+            }
+        });
+        els.heroTitle.addEventListener('keydown', (event) => {
+            if (!event) return;
+            if (event.target && event.target.closest && event.target.closest('input.hero-title-edit')) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            if (!canEditCurrentPlaylist()) return;
+            event.preventDefault();
+            startTitleEdit();
+        });
+    }
+
+    window.addEventListener('hashchange', () => {
+        if (isTitleEditing()) {
+            cancelTitleEdit();
+        }
+    });
 }
 
 function init() {
@@ -523,6 +1031,7 @@ function init() {
     bindUiHandlers();
     broker.start();
     setStatus('Waiting for library...');
+    queryAuthUser();
 
     window.addEventListener('hashchange', evaluateFragmentParameters);
 

@@ -156,6 +156,7 @@ The actual topic traffic, organized by direction:
 | `shell.queryPlaylists` | content      | playlists list, filtered by `type` (default `public`) |
 | `shell.queryPlaylist`  | content      | single playlist by `id` + its tracks               |
 | `shell.createPlaylist` | content      | create a private playlist for the current user     |
+| `shell.updatePlaylist` | content      | update an owned playlist (currently: title only)   |
 | `shell.queryFavorites` | content      | current user's favorites playlist                  |
 | `shell.queryUser`      | content      | current PocketBase auth state + user record        |
 
@@ -242,6 +243,37 @@ so the content frame can hand the response straight to the existing
 `handleIndexLoaded` pipeline. Access respects the PocketBase `playlists`
 list rule (`type='public' || @request.auth.id = user.id`); an
 unauthorised id resolves to `error: 'Playlist not found'`.
+
+## 7.2. `shell.updatePlaylist` payload
+
+The content frame calls `shell.updatePlaylist` to mutate a playlist it
+owns. The shell forwards it to `ShellCatalogService#updatePlaylist`,
+which validates input, rejects empty / reserved titles (`'__fav__'`),
+and writes through the PocketBase `playlists` collection. PocketBase
+enforces ownership via the collection's `updateRule`
+(`@request.auth.id != '' && @request.auth.id = user.id`), so the
+content frame should only surface the edit affordance for playlists
+where `playlist.userId === currentUser.id` and `playlist.type !== 'favorites'`.
+
+```ts
+type UpdatePlaylistRequest = {
+  id: string;                    // PocketBase record id of the playlist
+  updates: {
+    title?: string;              // trimmed; must be non-empty and not '__fav__'
+  };
+};
+
+type UpdatePlaylistResponse = {
+  id: string;
+  title: string;
+  type: 'private' | 'public' | 'favorites';
+  userId: string;
+};
+```
+
+Failures reject with a `request_failed` error whose `message` is
+`'Playlist not found'`, `'Title cannot be empty'`, `'Title is reserved'`,
+or `'Failed to update playlist'` depending on the failure mode.
 
 ## 8. Adding a new topic
 

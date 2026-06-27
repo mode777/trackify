@@ -146,3 +146,11 @@ Multi-page app under `web/` (Vite `root`):
   matched submodule paths at build time. Do not modify submodule contents.
 - `vite.config.mjs` sets `emptyOutDir: !isWatchBuild` so `vite build
   --watch` does not wipe prior outputs between iterations.
+
+## Important Instructions
+- If you observe any of these issues during thinking clear them with the user before you start the implementation
+  1. A possible misconception of the user (e.g. user asked to query a collection but the configured rules say it is usperusers only)
+  2. You noticed potential for a bug in the way the change was proposed and need to ask the user to consider the options on how to deal with it.
+  3. A decision has to be made that has medium to severe impact on the way the solution is implemented
+  4. The users input has gaps that need you to make architectural or design decisions.
+  5. Implementation needs you to make changes in a bigger scope that the user requested.

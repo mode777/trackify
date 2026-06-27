@@ -437,11 +437,23 @@ function initBroker() {
     shellBroker.handleRequest('shell.queryPlaylists', async ({ payload }) => {
         return catalogService.queryPlaylists(payload || {});
     });
+    shellBroker.handleRequest('shell.queryPlaylistsForTrack', async ({ payload }) => {
+        return catalogService.queryPlaylistsForTrack(payload && payload.trackId);
+    });
+    shellBroker.handleRequest('shell.addTrackToPlaylist', async ({ payload }) => {
+        return catalogService.addTrackToPlaylist(payload && payload.trackId, payload && payload.playlistId);
+    });
+    shellBroker.handleRequest('shell.removeTrackFromPlaylist', async ({ payload }) => {
+        return catalogService.removeTrackFromPlaylist(payload && payload.trackId, payload && payload.playlistId);
+    });
     shellBroker.handleRequest('shell.queryPlaylist', async ({ payload }) => {
         return catalogService.queryPlaylist(payload && payload.id);
     });
     shellBroker.handleRequest('shell.createPlaylist', async ({ payload }) => {
         return catalogService.createPlaylist(payload && payload.title);
+    });
+    shellBroker.handleRequest('shell.updatePlaylist', async ({ payload }) => {
+        return catalogService.updatePlaylist(payload && payload.id, payload && payload.updates);
     });
     shellBroker.handleRequest('shell.queryUser', async () => {
         return makeAuthUserPayload();
@@ -477,13 +489,34 @@ function initBroker() {
     shellBroker.start();
 }
 
+function navigateContentFrameToPlaylist(playlistId) {
+    if (typeof playlistId !== 'string' || !playlistId.trim()) return;
+    const contentFrame = document.getElementById('playlistFrame');
+    if (!contentFrame || !contentFrame.contentWindow) return;
+    const targetUrl = '/playlist.html#?playlist&id=' + encodeURIComponent(playlistId.trim());
+    try {
+        contentFrame.contentWindow.location.assign(targetUrl);
+        return;
+    } catch (_error) {
+        // Fall back to setting src if the iframe window is inaccessible.
+    }
+    try {
+        contentFrame.src = targetUrl;
+    } catch (_error) {
+        // Give up silently; the user can still navigate manually.
+    }
+}
+
 function bindCreatePlaylistButton() {
     const button = document.querySelector('.create-btn');
     if (!button) return;
 
     button.addEventListener('click', async () => {
         try {
-            await catalogService.createPlaylist();
+            const playlist = await catalogService.createPlaylist();
+            if (playlist && typeof playlist.id === 'string' && playlist.id) {
+                navigateContentFrameToPlaylist(playlist.id);
+            }
         } catch (error) {
             console.error('Failed to create playlist', error);
         }
