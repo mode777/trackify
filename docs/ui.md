@@ -193,6 +193,7 @@ The actual topic traffic, organized by direction:
 | `player.shuffle.toggle` | event | toggle shuffle on/off                           |
 | `player.seek.relative` | event | `{ seconds }` delta seek (signed)                |
 | `player.seek.absolute` | event | `{ seconds }` absolute seek                       |
+| `shell.content.rerender` | event | tell a content frame to re-parse its URL hash and re-render after a same-document `location.replace`; payload `{ href }`; published by `applyRouteToContentFrame` with `target: 'games' \| 'playlist'` (see [`docs/router.md` §6](router.md#6-iframe-navigation-sync--the-shell-only-history-model)) |
 
 ### Frame → shell
 
@@ -207,7 +208,6 @@ The actual topic traffic, organized by direction:
 | `shell.user.login`          | event  | PocketBase auth state became valid                 |
 | `shell.user.logout`         | event  | PocketBase auth state became invalid               |
 | `shell.navigation.requested`| event  | frame requests a shell-side navigation (see [`docs/frontend.md`](frontend.md#7-router-and-data-router-link)) |
-| `shell.iframe.popstate`     | event  | a content frame's `popstate` fired (browser back/forward targeted the iframe instead of the shell); payload `{ href, serviceId }` — the shell reverse-matches the iframe URL to a shell URL via `Router#findShellUrlForIframe` and `router.navigate(shellUrl, { replace: true })` |
 
 ## 7. `playlist.selected` payload
 
@@ -336,27 +336,37 @@ Frames publish this event via `createNavClient({ broker })` from
 `web/nav_client.js`; the shell subscribes directly to the topic in
 `web/app.js#initRouter`.
 
-## 7.4. `shell.iframe.popstate` payload
+## 7.4. `shell.content.rerender` payload
 
-A content frame's `window.addEventListener('popstate', ...)` listener
-publishes this event whenever the iframe's session history changes —
-either because the user pressed browser back/forward targeting the
-iframe, or because the shell set `frame.src = ...` and the iframe's
-history gained an entry.
+After the shell calls `frame.contentWindow.location.replace(next)` on a
+same-document navigation (e.g. `/games` → `/playlists`, both targeting
+`/collections.html` with different query strings), the iframe's URL is
+updated but neither `hashchange` nor `popstate` fires. The shell
+publishes this event so the iframe can re-parse its own hash and
+re-render to match the new URL.
 
 ```ts
-type IframePopstatePayload = {
-  href: string;          // frame.contentWindow.location.href at popstate time
-  serviceId: 'games' | 'playlist';  // which iframe sent it
+type ContentRerenderEventPayload = {
+  href: string;          // absolute URL the iframe was just replaced to
 };
 ```
 
-The shell reverse-matches `href` against the registered route table
-via `Router#findShellUrlForIframe` (see
-[`docs/router.md` §6](router.md#6-iframe-navigation-sync)) and
-`replaceState`s the shell so the address bar follows the iframe.
-Subscriber lives in `web/app.js#initRouter`; the frame-side listener
-lives in `web/collections.js` and `web/playlist.js`.
+The shell publishes with `target: 'games' | 'playlist'` (derived from
+the route's `target.html` via `serviceIdForHtml` in
+`web/app.js#applyRouteToContentFrame`). The receiving frame's
+subscriber simply re-runs its route parser:
+
+```js
+// web/collections.js init()
+broker.subscribe(CONTENT_RERENDER_TOPIC, () => applyRoute());
+
+// web/playlist.js bindBrokerHandlers()
+broker.subscribe(CONTENT_RERENDER_TOPIC, () => evaluateFragmentParameters());
+```
+
+Full reference for the shell-only-history model (why the iframe can't
+just observe its own URL change) is in
+[`docs/router.md` §6](router.md#6-iframe-navigation-sync--the-shell-only-history-model).
 
 ## 8. Adding a new topic
 

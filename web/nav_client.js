@@ -1,7 +1,7 @@
 'use strict';
 
 const NAVIGATION_REQUESTED_TOPIC = 'shell.navigation.requested';
-const IFRAME_POPSTATE_TOPIC = 'shell.iframe.popstate';
+const CONTENT_RERENDER_TOPIC = 'shell.content.rerender';
 
 function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -65,5 +65,5 @@ function buildNavClient({ broker }) {
 export {
     buildNavClient as createNavClient,
     NAVIGATION_REQUESTED_TOPIC,
-    IFRAME_POPSTATE_TOPIC,
+    CONTENT_RERENDER_TOPIC,
 };

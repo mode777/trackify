@@ -18,7 +18,7 @@ let tracks = [];
 let currentIndex = -1;
 let playlistInfo = {};
 let currentPlaylist = null;
-let playerReady = false;
+let playerReady = true;
 let pendingSelection = null;
 
 export function initPlaylistState({ broker: b, onSelectionChanged } = {}) {
@@ -28,7 +28,7 @@ export function initPlaylistState({ broker: b, onSelectionChanged } = {}) {
     currentIndex = -1;
     playlistInfo = {};
     currentPlaylist = null;
-    playerReady = false;
+    playerReady = true;
     pendingSelection = null;
 }
 

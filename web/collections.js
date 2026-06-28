@@ -10,7 +10,7 @@
  */
 
 import { createFrameBroker } from './broker.js';
-import { createNavClient, IFRAME_POPSTATE_TOPIC } from './nav_client.js';
+import { createNavClient, CONTENT_RERENDER_TOPIC } from './nav_client.js';
 
 const VALID_COLLECTION_TYPES = new Set(['games', 'playlists', 'platforms', 'artists']);
 const DEFAULT_TYPE = 'games';
@@ -551,21 +551,14 @@ function init() {
     updateHero();
     setStatus('Waiting for library...');
 
+    broker.subscribe(CONTENT_RERENDER_TOPIC, () => {
+        applyRoute();
+    });
+
     console.info('[trace][iframe:games] init', {
         href: window.location.href,
         historyLength: window.history.length,
         historyState: window.history.state,
-    });
-
-    window.addEventListener('popstate', () => {
-        console.info('[trace][iframe:games] popstate fired', {
-            href: window.location.href,
-            historyLength: window.history.length,
-        });
-        broker.publish(IFRAME_POPSTATE_TOPIC, {
-            href: window.location.href,
-            serviceId: 'games',
-        });
     });
 
     window.addEventListener('hashchange', () => {

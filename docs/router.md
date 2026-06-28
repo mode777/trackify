@@ -2,18 +2,18 @@
 
 Reference for the in-house SPA router (`web/router.js`), the frame-side
 navigation helper (`web/nav_client.js`), and the cross-frame plumbing
-that keeps the shell URL and the content iframe in sync. The
-high-level overview (where it sits in the shell, iframe topology,
-"add a route" walkthrough) lives in
-[`docs/frontend.md`](frontend.md#7-router-and-data-router-link);
-the broker topic rows live in [`docs/ui.md`](ui.md).
+that lets the shell own the browser's history while the content iframe
+is driven in-place. The high-level overview (where it sits in the
+shell, iframe topology, "add a route" walkthrough) lives in
+[`docs/frontend.md`](frontend.md#7-router-and-data-router-link); the
+broker topic rows live in [`docs/ui.md`](ui.md).
 
 ## 1. Modules
 
 | File | Role |
 | --- | --- |
-| `web/router.js` | `Router` class + `createRouter()` factory. Owns `window.location.pathname` + `window.location.search`, listens to `popstate`, pushes history, resolves paths against a route table, emits `navigationStart` / `navigated` / `navigationError`. Exposes `findShellUrlForIframe()` for reverse matching. |
-| `web/nav_client.js` | `createNavClient({ broker })` for content/player frames — returns `{ navigate, bindLinks }`. Publishes `shell.navigation.requested` and `shell.iframe.popstate` over the broker. Exports `NAVIGATION_REQUESTED_TOPIC` and `IFRAME_POPSTATE_TOPIC` constants. |
+| `web/router.js` | `Router` class + `createRouter()` factory. Owns `window.location.pathname` + `window.location.search`, listens to `popstate`, pushes/replaces history, resolves paths against a route table, emits `navigationStart` / `navigated` / `navigationError`. No iframe awareness. |
+| `web/nav_client.js` | `createNavClient({ broker })` for content/player frames — returns `{ navigate, bindLinks }`. Publishes `shell.navigation.requested` over the broker. Exports `NAVIGATION_REQUESTED_TOPIC` and `CONTENT_RERENDER_TOPIC` constants. |
 | `web/app.js` | Constructs the shell's `Router`, registers the route table, wires the broker subscriptions, drives `applyRouteToContentFrame` from `navigated`, and runs `syncSidebarActiveState`. |
 
 The router class lives **only in the shell** (`web/app.js`). Content
@@ -46,9 +46,6 @@ router.go(delta);                        // window.history.go(delta)
 // Inspection
 router.currentRoute();                   // current RouteMatch | null
 router.match(url);                       // pure: RouteMatch | null (no side effects)
-
-// Reverse matching (used by the iframe popstate forwarder)
-router.findShellUrlForIframe(iframeHref); // string | null
 
 // Events
 const off = router.subscribe(eventName, handler);  // returns unsubscribe fn
@@ -122,48 +119,72 @@ method:
 
 | Event | When | Payload | Used by |
 | --- | --- | --- | --- |
-| `navigationStart` | before `pushState`/`replaceState` | `{ from, to, cause }` | (reserved — not consumed in iteration 2) |
-| `navigated` | after `pushState`/`replaceState` | `{ from, to, cause }` | the shell's `applyRouteToContentFrame` + `syncSidebarActiveState`; the iframe popstate forwarder no-ops on this |
+| `navigationStart` | before `pushState`/`replaceState` | `{ from, to, cause }` | (reserved — not consumed) |
+| `navigated` | after `pushState`/`replaceState` | `{ from, to, cause }` | the shell's `applyRouteToContentFrame` + `syncSidebarActiveState` |
 | `navigationError` | no route matched, bad token, invalid URL | `{ url, reason }` | shell logs (and any subscriber) |
 
-`cause` is one of `'push' | 'replace' | 'pop' | 'token' | 'initial'` so
-the iframe subscriber can decide whether to fully swap the iframe
-(`push` / `initial`) or just react to a pop.
+`cause` is one of `'push' | 'replace' | 'pop' | 'token' | 'initial'`.
 
 ## 5. Cross-frame plumbing
 
-Two broker topics wire content frames to the shell's router:
+Two broker topics wire content frames to the shell's router / DOM:
 
 | Topic | Direction | Payload | See |
 | --- | --- | --- | --- |
 | `shell.navigation.requested` | frame → shell | `{ request: string \| NavigationToken; options?: { replace?, meta? } }` | [`docs/ui.md` §7.3](ui.md#73-shellnavigationrequested-payload) |
-| `shell.iframe.popstate`      | frame → shell | `{ href: string; serviceId: string }` | [`docs/ui.md` §6 frame → shell table](ui.md#6-topics-in-use) |
+| `shell.content.rerender` | shell → content | `{ href: string }` | [`docs/ui.md` §7.4](ui.md#74-shellcontentrerender-payload) |
 
-Both are published with the broker's default target (`'*'`); the
-broker dispatches them locally in shell mode and forwards to the shell
-when published from a frame.
+`shell.navigation.requested` is published with the broker's default
+target (`'*'`); the broker dispatches it locally in shell mode and
+forwards to the shell when published from a frame.
+`shell.content.rerender` is published with `target: 'games' |
+'playlist'` and routed by the shell broker to the matching service's
+registered `contentWindow`.
 
-## 6. Iframe navigation sync
+## 6. Iframe navigation sync — the shell-only history model
 
-The shell's `applyRouteToContentFrame` is the only thing that touches
-`#playlistFrame.src`:
+The browser's back/forward stack is owned exclusively by the shell.
+The content iframe holds a single history entry at any time and never
+grows. This is achieved by replacing — not pushing — the iframe's URL
+on every shell navigation:
 
-1. Reads `frame.contentWindow.location.href` (the iframe's actual URL,
-   normalised) and compares against the resolved `nextHref`.
-2. If equal, returns without touching the iframe.
-3. If different, sets `frame.src = next`. (`location.replace` was
-   considered and rejected — see pitfall §8.5.)
+```
+shell popstate / navigate / replace
+  → Router pushes shell history, emits 'navigated'
+  → applyRouteToContentFrame(to)
+       ├─ first load (frame.contentWindow.location.href === 'about:blank')
+       │     → frame.src = next                          (1 history entry)
+       ├─ cross-document nav (pathname changes)
+       │     → frame.contentWindow.location.replace(next) (full page load, history replaced)
+       └─ same-document nav (pathname unchanged, only ?… changes)
+             → frame.contentWindow.location.replace(next) (URL-only, no reload)
+             → shellBroker.publish('shell.content.rerender', { href: next }, { target: '<serviceId>' })
+```
 
-The iframe's `popstate` listener publishes `shell.iframe.popstate`
-with `{ href, serviceId }`. The shell's subscriber:
+`serviceIdForHtml(html)` maps `target.html` to the broker service id
+the iframe registered as (`/collections.html` → `'games'`,
+`/playlist.html` → `'playlist'`). It is used as the publish target so
+the broker routes the rerender signal to the right `contentWindow`.
 
-1. Reverse-matches `href` via `router.findShellUrlForIframe(href)` to a
-   shell URL.
-2. If the resolved shell URL equals `router.currentRoute().url`,
-   returns — this is the common case for shell-driven navigations where
-   the iframe's popstate fires as a side effect of `frame.src = ...`.
-3. Otherwise calls `router.navigate(shellUrl, { replace: true })`. The
-   `replace` is critical — see pitfall §8.3.
+The iframe's `hashchange` listener still fires for cross-document
+loads (it always has, after a full page load) and for hash-only
+subsequent changes inside the iframe. The
+`shell.content.rerender` topic fills the gap for query-string changes
+inside the same document — `location.replace` updates the URL but
+fires neither `hashchange` (query string, not hash) nor `popstate`
+(history not actually traversed). Each frame subscribes in `init()`:
+
+```js
+// web/collections.js
+broker.subscribe(CONTENT_RERENDER_TOPIC, () => applyRoute());
+
+// web/playlist.js
+broker.subscribe(CONTENT_RERENDER_TOPIC, () => evaluateFragmentParameters());
+```
+
+After the rerender, the iframe URL and the rendered view agree.
+The shell URL is the only one a user can reach with browser
+back/forward.
 
 ## 7. Sidebar active state
 
@@ -190,67 +211,21 @@ and `forwardEventToSubscribers` both handle. Same code path is used by
 content frames (where `target: '*'` is sent to the parent shell, which
 then dispatches locally via the inbound `processShellMessage`).
 
-### 8.2. Iframe history grows faster than shell history
+### 8.2. Same-document `location.replace` doesn't fire `hashchange` or `popstate`
 
-Every `frame.src = next` assignment adds an entry to the iframe's
-session history. If the user clicks through 5 routes, the iframe has
-5 entries (in addition to its initial `about:blank`), the shell has 5.
-The iframe is always ≥ 1 deeper.
+When two routes share the same iframe HTML (e.g. `/games` → `/playlists`
+both target `/collections.html`), `location.replace(next)` updates the
+iframe's URL but the browser does **not** fire `hashchange` (the change
+is in the query string, not the hash) and does **not** fire `popstate`
+(history was not actually traversed). Without the rerender signal,
+the iframe ends up at the right URL with the wrong view.
 
-Some browser builds (and Chrome when the iframe has DOM focus) treat
-the iframe as the "active" history on browser back: they pop the iframe
-first, and the shell's `popstate` never fires. Result: iframe content
-moves, title bar doesn't.
+This is why `applyRouteToContentFrame` publishes
+`shell.content.rerender` after every same-document replace. Do not
+remove the publish — it's the only thing that makes same-document
+navigations re-render.
 
-**Mitigation**: the `shell.iframe.popstate` forwarder (§6). When the
-iframe's popstate fires (whether from browser back targeting the
-iframe or from `frame.src = ...` — both fire popstate), the shell
-reverse-matches and `replaceState`s the shell URL. This keeps the
-shell URL in sync regardless of which frame the browser chose to pop.
-
-### 8.3. The popstate forwarder must `replace`, never `push`
-
-If the forwarder called `router.navigate(shellUrl)` (push) instead of
-`router.navigate(shellUrl, { replace: true })`, every iframe popstate
-would add a shell history entry. That would (a) pollute the back stack
-and (b) make the address bar jump forward by one entry every time the
-shell subscribed to `shell.iframe.popstate` for a shell-driven
-navigation.
-
-`replace` is idempotent: calling it repeatedly with the same URL
-produces a single, consistent history entry.
-
-### 8.4. The popstate forwarder must no-op on shell-driven navigations
-
-The iframe's `popstate` fires both for browser back AND for
-`frame.src = ...` (when the iframe is at a different URL). If the
-forwarder always called `router.navigate(shellUrl)`, every sidebar
-click would trigger a redundant forwarder call → replaceState →
-subscriber → iframe.
-
-The `currentRoute().url === shellUrl` guard in the subscriber (§6 step
-2) catches the shell-driven case and returns early. Don't remove it.
-
-### 8.5. `location.replace` in the iframe does NOT shrink its history
-
-Considered: in `applyRouteToContentFrame`, use
-`frame.contentWindow.location.replace(next)` to keep the iframe's
-history at 1 entry. Rejected because:
-
-- `window.history.length` for an iframe in Chrome mirrors the parent's
-  session history depth (verified empirically — the trace from a
-  50-deep shell reported `historyLength: 50` for the freshly-loaded
-  iframe).
-- So the iframe's history is "deep" by inheritance, not by `frame.src`
-  additions. `location.replace` only stops it from getting deeper;
-  it doesn't make it shallower.
-- Worse, `location.replace` to a same-document URL with a different
-  hash does not trigger the iframe's hash parser to re-render — the
-  iframe ends up at the right URL but with the wrong view.
-
-`frame.src = next` + popstate forwarder is the working combination.
-
-### 8.6. `frame.src` is unreliable; use `frame.contentWindow.location.href`
+### 8.3. `frame.src` is unreliable; use `frame.contentWindow.location.href`
 
 `HTMLIFrameElement.src` returns whatever the browser cached at
 attribute-set time — sometimes relative (`/collections.html#?type=games`),
@@ -259,7 +234,7 @@ in flight. `applyRouteToContentFrame` reads
 `frame.contentWindow.location.href` instead, which is always the
 iframe's current absolute URL.
 
-### 8.7. URL normalisation in `applyRouteToContentFrame`
+### 8.4. URL normalisation in `applyRouteToContentFrame`
 
 Both sides of the equality check are passed through
 `new URL(value, window.location.origin).href`. This:
@@ -270,29 +245,31 @@ Both sides of the equality check are passed through
 - Keeps the comparison robust against whether the browser stored the
   iframe URL as relative or absolute.
 
-### 8.8. `findShellUrlForIframe` requires exact hash match
+### 8.5. First load uses `frame.src`, subsequent loads use `location.replace`
 
-The reverse matcher iterates routes and tries to match each one against
-the iframe's URL. It is **strict** about the hash params:
+`frame.contentWindow.location.replace(...)` requires a document to
+exist in the iframe. On the very first call (iframe is still at
+`about:blank`, no `contentWindow` reachable), `applyRouteToContentFrame`
+falls back to `frame.src = next`. Every subsequent navigation uses
+`location.replace`. The fallback is gated by
+`currentHref !== 'about:blank'`; do not remove it.
 
-- Every key in the route's `target.hash` template must be present in
-  the iframe's hash with the right value (or the right `<placeholder>`
-  substitution).
-- The iframe's hash must not contain extra keys not in the template.
+### 8.6. Cross-document replaces must let the new document re-register
 
-Example: an iframe at `/collections.html#?type=playlists&platform=SNES`
-does **not** match `/playlists` (extra `platform` key) and does not
-match `/platforms/<name>` (`type` value mismatch — template says
-`games`, iframe says `playlists`). It would match `/platforms/<name>`
-only if the iframe were at `?type=games&platform=SNES`.
+`location.replace` causes a full page load for cross-document
+navigations (`/collections.html` → `/playlist.html`). The new
+document's `init()` runs from scratch — including `broker.start()`
+which sends `control/service.register` to the shell. The shell
+broker replaces the old `contentWindow` in its service registry. The
+old `contentWindow` reference becomes invalid; any in-flight messages
+to it are dropped (they'd arrive on a now-defunct window).
 
-If a future route lands at an iframe URL the reverse matcher cannot
-resolve, the forwarder logs `[trace][shell] iframe popstate` with
-`resolvedShellUrl: null` and silently no-ops. The fix is to either
-adjust the iframe URL the route produces or to add a more specific
-template.
+`applyRouteToContentFrame` does not publish `shell.content.rerender`
+for cross-document replaces — the new document's `init()` handles its
+own initial render via the route's hash, so no explicit signal is
+needed.
 
-### 8.9. Root path redirect via `replaceState` *before* `router.start()`
+### 8.7. Root path redirect via `replaceState` *before* `router.start()`
 
 If `window.location.pathname === '/'` (or empty), `initRouter` does
 `window.history.replaceState({}, '', '/games')` **before** calling
@@ -306,7 +283,7 @@ order is wrong — `start()` fires `navigationError` first, then the
 subscriber's later `replaceState` triggers a manual navigate. Log
 noise + an extra history entry.
 
-### 8.10. `navigated` subscribers must not call `router.navigate`
+### 8.8. `navigated` subscribers must not call `router.navigate`
 
 The `navigated` handler runs **inside** `router.start()`'s initial
 emit (and after every `pushState`/`replaceState`). If a subscriber
@@ -320,7 +297,7 @@ Current subscribers (`applyRouteToContentFrame`, `syncSidebarActiveState`)
 are pure — they read state and update DOM, no router re-entry. Keep it
 that way.
 
-### 8.11. `data-route` matching is exact by design
+### 8.9. `data-route` matching is exact by design
 
 Iteration 2 deliberately uses exact-match for sidebar active state:
 `data-route="/games"` does not light up when you're at `/games/<id>`.
@@ -333,7 +310,7 @@ question).
 If prefix matching is wanted later, the comparison in
 `syncSidebarActiveState` is the single line to change.
 
-### 8.12. Pattern registration order is irrelevant (but be aware)
+### 8.10. Pattern registration order is irrelevant (but be aware)
 
 The router iterates `this.routes` in registration order, returning on
 the first match. The current patterns do not overlap
@@ -350,14 +327,13 @@ the most-specific pattern must be registered first.
 3. Add a sidebar link with `data-router-link data-route="<exact-pattern>"`.
 4. If the route's iframe target has a new hash param the frame doesn't
    parse yet, extend `web/playlist/navigation.js` or
-   `web/collections.js#paramsFromFragment` accordingly.
-5. If the new iframe URL isn't reverse-mappable from a hash that
-   `findShellUrlForIframe` can recognise, no extra work — the matcher
-   walks the route table and will pick it up automatically.
+   `web/collections.js#paramsFromFragment` accordingly. The frame's
+   existing `CONTENT_RERENDER_TOPIC` subscriber will pick up the new
+   route automatically — no router-side wiring needed.
 
 ## 10. Adding a new cross-frame topic
 
 If a new topic is added (e.g. for future guard/canDeactivate
 semantics), see [`docs/ui.md` §8](ui.md#8-adding-a-new-topic). The
 router itself does not define new topics — it consumes the existing
-two via the broker and otherwise lives entirely on the shell.
+one via the broker and otherwise lives entirely on the shell.

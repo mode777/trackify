@@ -8,7 +8,7 @@
 'use strict';
 
 import { createFrameBroker } from './broker.js';
-import { createNavClient, IFRAME_POPSTATE_TOPIC } from './nav_client.js';
+import { createNavClient, CONTENT_RERENDER_TOPIC } from './nav_client.js';
 
 import { els } from './playlist/dom.js';
 import { setStatus } from './playlist/status_ui.js';
@@ -58,7 +58,7 @@ import {
 } from './playlist/public_toggle_ui.js';
 import { bindTrackListUi, renderTracks, refreshFavoriteIcons } from './playlist/track_list_ui.js';
 import { initAddToPlaylistPopup, openAddToPlaylistPopup } from './playlist/add_to_playlist_popup.js';
-import { initNavigation } from './playlist/navigation.js';
+import { initNavigation, evaluateFragmentParameters } from './playlist/navigation.js';
 
 const broker = createFrameBroker({
     serviceId: 'playlist',
@@ -106,6 +106,10 @@ function bindBrokerHandlers() {
 
     broker.subscribe('shell.user.logout', ({ payload }) => {
         applyAuthUser(payload);
+    });
+
+    broker.subscribe(CONTENT_RERENDER_TOPIC, () => {
+        evaluateFragmentParameters();
     });
 }
 
@@ -203,17 +207,6 @@ function init() {
         href: window.location.href,
         historyLength: window.history.length,
         historyState: window.history.state,
-    });
-
-    window.addEventListener('popstate', () => {
-        console.info('[trace][iframe:playlist] popstate fired', {
-            href: window.location.href,
-            historyLength: window.history.length,
-        });
-        broker.publish(IFRAME_POPSTATE_TOPIC, {
-            href: window.location.href,
-            serviceId: 'playlist',
-        });
     });
 
     window.addEventListener('hashchange', () => {

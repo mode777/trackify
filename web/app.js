@@ -11,7 +11,7 @@ import PocketBase from 'pocketbase';
 import { createShellBroker } from './broker.js';
 import { ShellCatalogService } from './catalog_service.js';
 import { createRouter } from './router.js';
-import { createNavClient, NAVIGATION_REQUESTED_TOPIC, IFRAME_POPSTATE_TOPIC } from './nav_client.js';
+import { createNavClient, NAVIGATION_REQUESTED_TOPIC, CONTENT_RERENDER_TOPIC } from './nav_client.js';
 
 const shellBroker = createShellBroker({
     serviceId: 'shell',
@@ -425,6 +425,12 @@ function syncSidebarActiveState(routeMatch) {
     }
 }
 
+function serviceIdForHtml(html) {
+    if (html === '/collections.html') return 'games';
+    if (html === '/playlist.html') return 'playlist';
+    return null;
+}
+
 function applyRouteToContentFrame(routeMatch) {
     const frame = document.getElementById('playlistFrame');
     if (!frame || !routeMatch || !routeMatch.target) return;
@@ -439,10 +445,12 @@ function applyRouteToContentFrame(routeMatch) {
     }
     let currentHref = '';
     let iframeHistoryLength = null;
+    let canReplace = false;
     try {
         if (frame.contentWindow && frame.contentWindow.location) {
             currentHref = frame.contentWindow.location.href;
             iframeHistoryLength = frame.contentWindow.history ? frame.contentWindow.history.length : null;
+            canReplace = currentHref !== 'about:blank' && currentHref !== '';
         }
     } catch (_error) {
     }
@@ -456,9 +464,37 @@ function applyRouteToContentFrame(routeMatch) {
         shellHistoryLength: window.history ? window.history.length : null,
     });
     if (currentHref && currentHref === nextHref) return;
+    if (!canReplace) {
+        try {
+            frame.src = next;
+        } catch (_error) {
+        }
+        return;
+    }
+    let sameDocument = false;
     try {
-        frame.src = next;
+        const cur = new URL(currentHref);
+        const nxt = new URL(nextHref);
+        sameDocument = cur.origin === nxt.origin && cur.pathname === nxt.pathname;
     } catch (_error) {
+    }
+    try {
+        frame.contentWindow.location.replace(nextHref);
+    } catch (_error) {
+        try {
+            frame.src = next;
+        } catch (_error2) {
+        }
+        return;
+    }
+    if (sameDocument) {
+        const targetServiceId = serviceIdForHtml(html);
+        if (targetServiceId) {
+            try {
+                shellBroker.publish(CONTENT_RERENDER_TOPIC, { href: nextHref }, { target: targetServiceId });
+            } catch (_error) {
+            }
+        }
     }
 }
 
@@ -508,23 +544,6 @@ function initRouter() {
         const options = payload && payload.options ? payload.options : {};
         router.navigate(request, options).catch((error) => {
             console.error('[router] navigation request failed', error);
-        });
-    });
-
-    shellBroker.subscribe(IFRAME_POPSTATE_TOPIC, ({ payload }) => {
-        const href = payload && payload.href;
-        if (typeof href !== 'string' || !href) return;
-        const shellUrl = router.findShellUrlForIframe(href);
-        console.info('[trace][shell] iframe popstate', {
-            href,
-            resolvedShellUrl: shellUrl,
-            currentShellUrl: router.currentRoute() ? router.currentRoute().url : null,
-        });
-        if (!shellUrl) return;
-        const current = router.currentRoute();
-        if (current && current.url === shellUrl) return;
-        router.navigate(shellUrl, { replace: true }).catch((error) => {
-            console.error('[router] iframe popstate navigation failed', error);
         });
     });
 

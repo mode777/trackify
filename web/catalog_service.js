@@ -32,6 +32,7 @@ function pickRandomChoice(list) {
 export class ShellCatalogService {
     constructor() {
         this.pb = new PocketBase();
+        this.pb.autoCancellation(false);
         this.extensions = EXTENSIONS;
 
         this.indexTracks = [];
@@ -45,6 +46,7 @@ export class ShellCatalogService {
         this.favoritesPlaylistCache = null;
         this.favoritesTracksCache = null;
         this.favoritesTracksCacheUser = null;
+        this.favoritesInFlight = null;
 
         this.artists = [];
         this.artistsLoadError = '';
@@ -63,11 +65,21 @@ export class ShellCatalogService {
         if (this.favoritesTracksCache && this.favoritesTracksCacheUser === userId) {
             return this.favoritesTracksCache;
         }
-        const playlist = await this.getOrCreateFavoritesPlaylist();
-        const response = await this.pb.collection(PLAYLIST_TRACKS_VIEW_COLLECTION).getList(1, 1000, { filter: `playlistId="${playlist.id}"` });
-        this.favoritesTracksCache = this.parseTracksManifest(response.items);
-        this.favoritesTracksCacheUser = userId;
-        return this.favoritesTracksCache;
+        if (this.favoritesInFlight) {
+            return this.favoritesInFlight;
+        }
+        this.favoritesInFlight = (async () => {
+            try {
+                const playlist = await this.getOrCreateFavoritesPlaylist();
+                const response = await this.pb.collection(PLAYLIST_TRACKS_VIEW_COLLECTION).getList(1, 1000, { filter: `playlistId="${playlist.id}"` });
+                this.favoritesTracksCache = this.parseTracksManifest(response.items);
+                this.favoritesTracksCacheUser = userId;
+                return this.favoritesTracksCache;
+            } finally {
+                this.favoritesInFlight = null;
+            }
+        })();
+        return this.favoritesInFlight;
     }
 
     async addFavorite(trackId) {

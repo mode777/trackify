@@ -171,68 +171,6 @@ class Router {
         return this.currentMatch;
     }
 
-    findShellUrlForIframe(iframeHref) {
-        if (typeof iframeHref !== 'string' || !iframeHref) return null;
-        let parsed;
-        try {
-            const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-            parsed = new URL(iframeHref, base);
-        } catch (_error) {
-            return null;
-        }
-        const iframePath = parsed.pathname || '/';
-        const iframeHash = parsed.hash || '';
-        const queryPart = iframeHash.startsWith('#') ? iframeHash.slice(1) : iframeHash;
-        const iframeParams = queryPart
-            ? Object.fromEntries(new URLSearchParams(queryPart).entries())
-            : {};
-
-        for (const route of this.routes) {
-            if (!route.target || route.target.html !== iframePath) continue;
-            const hashTemplate = route.target.hash || '';
-            const templateParams = hashTemplate ? new URLSearchParams(hashTemplate) : null;
-
-            if (!templateParams || templateParams.toString().length === 0) {
-                if (Object.keys(iframeParams).length === 0) {
-                    return route.pattern;
-                }
-                continue;
-            }
-
-            const shellParams = {};
-            let matches = true;
-            for (const [key, value] of templateParams.entries()) {
-                if (!Object.prototype.hasOwnProperty.call(iframeParams, key)) {
-                    matches = false;
-                    break;
-                }
-                const placeholder = value.match(/^<([A-Za-z_][A-Za-z0-9_]*)>$/);
-                if (placeholder) {
-                    shellParams[placeholder[1]] = iframeParams[key];
-                } else if (iframeParams[key] !== value) {
-                    matches = false;
-                    break;
-                }
-            }
-            if (!matches) continue;
-            let hasExtra = false;
-            for (const key of Object.keys(iframeParams)) {
-                if (!templateParams.has(key)) {
-                    hasExtra = true;
-                    break;
-                }
-            }
-            if (hasExtra) continue;
-
-            let shellUrl = route.pattern;
-            for (const [key, value] of Object.entries(shellParams)) {
-                shellUrl = shellUrl.split('<' + key + '>').join(encodeURIComponent(value));
-            }
-            return shellUrl;
-        }
-        return null;
-    }
-
     match(url) {
         const parsed = parseUrl(url);
         if (!parsed) return null;

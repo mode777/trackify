@@ -57,11 +57,12 @@ another directly. The message contract lives in [`docs/ui.md`](ui.md).
 
 ## 3. Content frame (`#playlistFrame`)
 
-The `<iframe name="content-frame">` slot is reused — only one of
-`collections.html` or `playlist.html` is loaded at a time. The shell
-swaps them by following `<a target="content-frame">` navigation
-links, and the shell's `createIframeHistoryTracker` records the
-back/forward history for the iframe slot.
+The content-frame slot is reused — only one of `collections.html` or
+`playlist.html` is loaded at a time. The shell owns the browser's
+history; the iframe holds a single history entry and is driven
+in-place via `frame.contentWindow.location.replace(...)`. See
+[`docs/router.md` §6](router.md#6-iframe-navigation-sync--the-shell-only-history-model)
+for the full model.
 
 Two services live here, each with its own `serviceId`:
 
@@ -119,9 +120,11 @@ PocketBase from the top level. Its concerns are:
   shared across the shell's request handlers (`web/app.js:21`).
 - **Google OAuth flow** — `authWithOAuth2({ provider: 'google' })`
   on click of the sign-in button (see [`docs/database.md`](database.md#142-runtime-oauth2-round-trip)).
-- **Iframe history** — `createIframeHistoryTracker` keeps
-  back/forward buttons for the `#playlistFrame` slot (the player
-  frame is loaded once and never navigates).
+- **Iframe history** — the shell owns the browser's back/forward
+  stack; the content iframe is driven in-place via
+  `frame.contentWindow.location.replace(...)` so it never grows
+  past a single history entry. See
+  [`docs/router.md` §6](router.md#6-iframe-navigation-sync--the-shell-only-history-model).
 - **Favorites playlist flow** — subscribes to `playlist.liked` /
   `playlist.unliked` and writes through `pb.collection(...)`; lazily
   provisions the per-user `type='favorites'` playlist if missing.
@@ -174,10 +177,25 @@ The shape of a request:
    (e.g. `/playlist.html` + `hash: '?type=playlist&id=<id>'`).
 3. On match, the router `history.pushState`s the URL into the shell's
    history and emits `navigated`. The shell's `navigated` subscriber
-   sets `#playlistFrame.src` to the resolved target HTML + hash.
-4. The iframe loads with the new hash. The iframe's own hash parser
-   (`web/playlist/navigation.js`, `collections.js#applyRoute`) reacts
-   to the resulting `hashchange` and renders accordingly.
+   calls `applyRouteToContentFrame(to)`:
+   - If the iframe is still at `about:blank` (first paint), sets
+     `#playlistFrame.src = next` — the iframe loads normally and
+     creates its single history entry.
+   - Otherwise calls
+     `frame.contentWindow.location.replace(nextHref)` — the iframe's
+     history entry is replaced, no new entry is added. The shell URL
+     remains the only anchor the browser back/forward stack cares
+     about.
+   - For same-document navigations (pathname unchanged, only
+     `?…` differs), the `location.replace` updates the URL but
+     fires neither `hashchange` nor `popstate`. The shell publishes
+     `shell.content.rerender` to the iframe's service id so its
+     existing handler re-runs `applyRoute()` /
+     `evaluateFragmentParameters()` against the new URL.
+4. The iframe's hash parser
+   (`web/playlist/navigation.js`, `collections.js#applyRoute`)
+   runs once on first load and again whenever the shell publishes
+   `shell.content.rerender`.
 
 The router emits three events: `navigationStart` (before
 `pushState`), `navigated` (after, with the `RouteMatch`), and
@@ -196,6 +214,7 @@ only — there is no fallback route in iteration 1.
 | Topic                          | Direction | Payload                                                  |
 | ------------------------------ | --------- | -------------------------------------------------------- |
 | `shell.navigation.requested`   | frame → shell | `{ request: string \| NavigationToken; options?: { replace?, meta? } }` |
+| `shell.content.rerender`       | shell → content | `{ href: string }` — see [`docs/ui.md` §7.4](ui.md#74-shellcontentrerender-payload) |
 
 Where `NavigationToken` is `{ token: 'back' \| 'forward' \| 'go', delta? }`.
 Documented in [`docs/ui.md`](ui.md) §6.
@@ -212,8 +231,6 @@ Documented in [`docs/ui.md`](ui.md) §6.
   `data-route`. The `data-route` value is matched exactly against
   `RouteMatch.pattern` by `syncSidebarActiveState` to drive the
   `.active` class.
-
-## 8. Adding a new page or service
 
 ## 8. Adding a new page or service
 
@@ -234,9 +251,9 @@ Documented in [`docs/ui.md`](ui.md) §6.
 4. Add a row for the iframe hash to the frame's internal hash
    parser (`web/playlist/navigation.js` or
    `collections.js#applyRoute`) if it is not already covered.
-5. The reverse matcher (`Router#findShellUrlForIframe` —
-   [`docs/router.md` §6](router.md#6-iframe-navigation-sync)) picks the
-   new route up automatically from the registered target.
+5. The frame's existing `CONTENT_RERENDER_TOPIC` subscriber picks the
+   new route up automatically — no additional router-side wiring is
+   needed (see [`docs/router.md` §6](router.md#6-iframe-navigation-sync--the-shell-only-history-model)).
 
 ### Adding a new iframe service
 
