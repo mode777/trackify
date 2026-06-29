@@ -54,3 +54,19 @@ const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 export function isHexColor(value) {
     return typeof value === 'string' && HEX_COLOR_PATTERN.test(value.trim());
 }
+
+export const ARTIST_ICON = 'person';
+
+export function paletteColorForArtist(name) {
+    const palette = PLAYLIST_PALETTE;
+    if (!Array.isArray(palette) || palette.length === 0) return '';
+    const text = typeof name === 'string' ? name : '';
+    if (!text) return palette[0];
+
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+        hash = (hash * 31 + text.charCodeAt(i)) | 0;
+    }
+    const index = Math.abs(hash) % palette.length;
+    return palette[index];
+}

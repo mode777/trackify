@@ -186,6 +186,30 @@ After the rerender, the iframe URL and the rendered view agree.
 The shell URL is the only one a user can reach with browser
 back/forward.
 
+### 6.1. Top-bar back/forward buttons
+
+The shell's top-bar chevron buttons
+(`[data-history-action="back"]` / `forward` in `web/index.html`)
+mirror the browser controls. `bindHistoryButtons()` in `web/app.js`
+wires them straight to `router.back()` / `router.forward()` — no
+extra broker topic, no nav-client hop.
+
+Browsers don't expose whether forward entries exist, so the shell
+tracks its own logical cursor in a `(stack, cursor)` pair and
+updates it from the router's `navigated` events:
+
+- `cause: 'push' | 'initial'` — drop everything past `cursor`, push
+  the new URL, advance `cursor`.
+- `cause: 'replace'` — overwrite `stack[cursor]`.
+- `cause: 'pop' | 'token'` — locate `to.url` in `stack` and move
+  `cursor` to that index (covers both back and forward — they're
+  symmetric to the router).
+
+The buttons' `disabled` flag is then just `cursor <= 0` (back) and
+`cursor >= stack.length - 1` (forward). The `disabled` attribute
+stays on the markup as the initial state so the buttons render
+disabled before `init()` runs.
+
 ## 7. Sidebar active state
 
 The shell sidebar links carry `data-route` attributes matching their

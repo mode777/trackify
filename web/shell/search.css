@@ -1,0 +1,202 @@
+.search-popover {
+    position: fixed;
+    z-index: 60;
+    max-height: min(420px, calc(100vh - 24px));
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-high);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    font-family: Inter, sans-serif;
+    overflow: hidden;
+}
+
+.search-popover-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) transparent;
+}
+
+.search-popover-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.search-popover-list::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 4px;
+}
+
+.search-popover-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.search-popover-status {
+    padding: 18px 14px;
+    font-size: 0.86rem;
+    color: var(--muted);
+    text-align: center;
+}
+
+.search-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) 36px;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 0 6px;
+}
+
+.search-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.search-row-cover {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background:
+        linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
+        radial-gradient(circle at 30% 20%, #5f5f8a, #273b53 58%, #111827 100%);
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.search-row-cover:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.search-row-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.search-row-cover-fallback {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 1.6rem;
+    color: var(--muted);
+}
+
+.search-row-cover-play {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.32);
+    color: var(--text);
+    font-size: 1.6rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.search-row-cover:hover .search-row-cover-play,
+.search-row-cover:focus-visible .search-row-cover-play {
+    display: inline-flex;
+}
+
+.search-row-meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.search-row-title {
+    color: var(--text);
+    font-family: Montserrat, sans-serif;
+    font-size: 0.92rem;
+    line-height: 1.15;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.search-row-sub {
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.search-row-game,
+.search-row-artist {
+    color: inherit;
+    text-decoration: none;
+}
+
+.search-row-game:hover,
+.search-row-game:focus-visible,
+.search-row-artist:hover,
+.search-row-artist:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
+}
+
+.search-row-favorite {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: color 120ms ease, opacity 120ms ease;
+    opacity: 0;
+}
+
+.search-row-favorite .material-symbols-outlined {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.search-row:hover .search-row-favorite,
+.search-row-favorite:focus-visible,
+.search-row-favorite.is-favorite {
+    opacity: 1;
+}
+
+.search-row-favorite.is-favorite {
+    color: var(--accent);
+}
+
+.search-row-favorite:hover,
+.search-row-favorite:focus-visible {
+    color: var(--accent);
+    outline: none;
+}
+
+.search-row-favorite:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+@media (max-width: 700px) {
+    .search-popover {
+        max-height: min(60vh, calc(100vh - 80px));
+    }
+}

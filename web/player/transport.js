@@ -36,6 +36,7 @@ import {
 let currentIndex = -1;
 let busy = false;
 let tracks = [];
+let currentSource = '';
 let lastPlaybackState = 'none';
 
 let shuffleEnabled = false;
@@ -58,6 +59,18 @@ export function isBusy() {
 
 export function getLastPlaybackState() {
     return lastPlaybackState;
+}
+
+export function getCurrentPlaylist() {
+    const currentTrack = tracks[currentIndex] && typeof tracks[currentIndex].id === 'string'
+        ? tracks[currentIndex].id
+        : null;
+    return {
+        source: currentSource,
+        tracks: tracks.slice(),
+        selectedIndex: currentIndex,
+        currentTrack,
+    };
 }
 
 export function isShuffleEnabled() {
@@ -375,6 +388,8 @@ export function seekToSeconds(seconds) {
 export function handlePlaylistSelected(payload, autoplay) {
     if (!payload || !Array.isArray(payload.tracks)) return;
 
+    currentSource = typeof payload.source === 'string' ? payload.source : '';
+
     tracks = payload.tracks
         .filter((track) => track && typeof track.title === 'string' && typeof track.file === 'string')
         .map((track) => ({
@@ -383,6 +398,7 @@ export function handlePlaylistSelected(payload, autoplay) {
             file: track.file,
             platform: typeof track.platform === 'string' ? track.platform : '',
             game: typeof track.game === 'string' ? track.game : '',
+            gameId: typeof track.gameId === 'string' ? track.gameId : '',
             artist: typeof track.artist === 'string' ? track.artist : '',
             coverArt: typeof track.coverArt === 'string' ? track.coverArt : '',
         }));

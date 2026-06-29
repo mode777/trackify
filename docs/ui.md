@@ -167,7 +167,7 @@ The actual topic traffic, organized by direction:
 
 | Topic                       | Requested by | Purpose                                            |
 | --------------------------- | ------------ | -------------------------------------------------- |
-| `shell.queryIndex`          | content      | tracks for a game (or all)                         |
+| `shell.queryIndex`          | content      | tracks for a game (or all). Accepts `{ game }`, `{ artist }`, `{ title }` (title-only LIKE), or `{ q }` (case-insensitive substring across `title`, `game`, `artist`, sorted by title). |
 | `shell.queryGames`          | content      | games list, optionally filtered by id / platform   |
 | `shell.queryArtists`        | content      | artists list, optionally filtered by name          |
 | `shell.queryPlaylists`      | content      | playlists list, filtered by `type` (default `public`). `type=own` returns every playlist the current user owns except the row with `type="favorites"` (the favorites playlist has its own dedicated hero/link and is never surfaced in a grid). |
@@ -185,6 +185,7 @@ The actual topic traffic, organized by direction:
 | Topic                | Type   | Purpose                                            |
 | -------------------- | ------ | -------------------------------------------------- |
 | `playlist.selected`  | event  | tells the player which playlist to load + autoplay  |
+| `shell.favorites.changed` | event | shell-initiated favorites toggle fanout so the playlist frame's favorites Set stays live; payload `{ trackId, isFavorite }`; target `*` |
 | `player.toggle`      | event  | toggles play/pause (used by media key fallback)    |
 | `player.play`        | event  | play current/selected                              |
 | `player.pause`       | event  | pause playback                                     |
@@ -209,6 +210,16 @@ The actual topic traffic, organized by direction:
 | `shell.user.logout`         | event  | PocketBase auth state became invalid               |
 | `shell.navigation.requested`| event  | frame requests a shell-side navigation (see [`docs/frontend.md`](frontend.md#7-router-and-data-router-link)) |
 
+### Frame request handlers
+
+Frame-to-frame requests are sent with `target: '<service-id>'`; the shell
+routes them to the target frame, where `broker.handleRequest(...)` answers
+them. They never hit a shell-local handler.
+
+| Topic                       | Requested by | Handled by | Purpose                                            |
+| --------------------------- | ------------ | ---------- | -------------------------------------------------- |
+| `player.getCurrentPlaylist` | playlist     | player     | snapshot of the player's current queue + active track id; lets the playlist frame highlight the right row on initial load instead of waiting for the next `player.stateChanged` |
+
 ## 7. `playlist.selected` payload
 
 The `playlist.selected` event is the canonical handoff from the content
@@ -217,8 +228,13 @@ payload shape:
 
 ```ts
 type PlaylistSelectedEventPayload = {
-  source: string;               // e.g. 'tracks/index.json' or 'favorites'
-  selectedIndex: number;        // -1 when the playlist is empty
+  source: string;               // informational origin tag; in use today:
+                                //   'sample-files/index.json' — game flow (collections play button)
+                                //   'playlist:<id>'         — user playlist flow (standalone page + collections play button)
+                                //   'favorites'             — PocketBase favorites playlist
+  selectedIndex: number;        // -1 when the playlist is empty; otherwise the player
+                                //   clamps to [0, tracks.length-1] so publishers can send
+                                //   the natural index without bounds checks
   tracks: Array<{
     id: string;                 // shell-assigned stable id, e.g. 'sample-0'
     title: string;
@@ -237,6 +253,10 @@ The `file` field must be resolvable from the player frame's origin.
 For PocketBase-backed tracks, the shell rewrites it to
 `/api/files/games/<gameId>/` (see
 `ShellCatalogService#resolveFilename` in `web/catalog_service.js`).
+
+The player drops any track that is missing `title` or `file` before
+applying `selectedIndex`, so publishers can hand the raw response from
+`shell.queryPlaylist` straight through without re-filtering.
 
 ## 7.1. `shell.queryPlaylist` payload
 
@@ -265,6 +285,27 @@ so the content frame can hand the response straight to the existing
 `handleIndexLoaded` pipeline. Access respects the PocketBase `playlists`
 list rule (`type='public' || @request.auth.id = user.id`); an
 unauthorised id resolves to `error: 'Playlist not found'`.
+
+### Caller contract (catch-and-resolve)
+
+`shell.queryPlaylist` is **catch-and-resolve**, not throw-on-error. The
+broker promise resolves with `{ tracks: [], playlist: null, error: '...' }`
+for both "row not found" and "permission denied" (PocketBase returns 404
+in both cases because of the `viewRule`/`listRule`), and for any
+transport-level error (`error: 'Error loading playlist (see console)'`).
+The promise only rejects when the broker itself fails (timeout, shell
+not ready, decode failure).
+
+Callers must therefore treat `payload.error` as the primary failure
+signal and short-circuit before publishing — a bare `try { … } catch {… }`
+will not catch the not-found / not-allowed cases. The right pattern is:
+
+```js
+const payload = await broker.request('shell.queryPlaylist', { id }, …);
+if (payload?.error) { setStatus(payload.error); return; }
+if (!payload.tracks.length) { setStatus('Empty playlist'); return; }
+// safe to publish payload.tracks to 'playlist.selected' now
+```
 
 ## 7.2. `shell.updatePlaylist` payload
 
@@ -368,6 +409,50 @@ Full reference for the shell-only-history model (why the iframe can't
 just observe its own URL change) is in
 [`docs/router.md` §6](router.md#6-iframe-navigation-sync--the-shell-only-history-model).
 
+## 7.5. `player.getCurrentPlaylist` payload
+
+The playlist frame sends this request to the player frame (via the
+shell) right after `applyIndexPayload` and on `player.ready`, so the
+highlighted row in the track list matches the player's active track
+from the first paint — without waiting for the next
+`player.stateChanged`. The player answers synchronously from
+`transport.getCurrentPlaylist()`; the playlist then matches the
+player's `source` against its own `playlistInfo.source` and the
+player's `currentTrack` id against a local track row, only updating
+`currentIndex` when both match (so navigating to a different
+playlist never relocates the highlight to an unrelated track).
+
+```ts
+type GetCurrentPlaylistRequest = {
+  // intentionally empty — the snapshot is whatever the player has loaded
+};
+
+type GetCurrentPlaylistResponse = {
+  source: string;               // mirrors `playlist.selected.source`; '' when
+                                //   the player has no queue loaded
+  tracks: Array<{                // mirrors `playlist.selected.tracks`
+    id: string;
+    title: string;
+    file: string;
+    platform: string;
+    game: string;
+    gameId: string;
+    artist: string;
+    coverArt: string;
+  }>;
+  selectedIndex: number;        // player's current index; -1 when the queue
+                                //   is empty
+  currentTrack: string | null;  // id of the player's current track; null
+                                //   when `selectedIndex < 0` or the row
+                                //   has no string `id`
+};
+```
+
+The request is `catch-and-ignore`: errors (player not registered, not
+ready, request timeout) are swallowed on the playlist side. There is
+no retry — a subsequent `player.stateChanged` will keep the
+highlight in sync if the response never lands.
+
 ## 8. Adding a new topic
 
 1. Pick a topic name in the existing namespace
@@ -383,8 +468,54 @@ just observe its own URL change) is in
    - Forwarded to another frame — `shellBroker.routeRequestTopic(...)`
      so the shell routes incoming requests of that topic straight to
      the target service instead of a shell-local handler.
+   - Frame-side handler — `broker.handleRequest(...)` in the target
+     frame (e.g. `web/player.js#bindBrokerHandlers`). The request is
+     sent with `target: '<service-id>'`; the shell routes it to the
+     frame and the frame's handler answers.
    - Subscribe to the event on the receiving side.
 5. Document the payload in this file.
+
+### PocketBase `pb.filter()` parameter format
+
+`pb.filter(template, params)` (PocketBase JS SDK ≥ 0.21) substitutes
+`{:<key>}` placeholders by wrapping values based on their JS type:
+
+- `string` → wrapped in single quotes, e.g. `Chrono` becomes `'Chrono'`.
+- `number` / `boolean` → bare literal.
+- anything else → `null` / ISO date / `'JSON.stringify(value)'`.
+
+Passing a `JSON.stringify(...)`-wrapped string — e.g.
+`pb.filter('title~{:p}', { p: JSON.stringify('Chrono') })` — produces
+`title~'"Chrono"'` (single quotes added by the SDK *around* the
+double-quote literal), which PocketBase parses as `LIKE '"Chrono"'`
+and matches nothing. Always pass the raw string:
+
+```js
+pb.filter('title~{:pattern}', { pattern: trimmed })  // -> title~'Chrono'
+```
+
+The SDK also escapes single quotes inside string values
+(`'` → `\\'`), so track titles containing an apostrophe are safe.
+
+### Shell-local handlers can only be called from a frame
+
+`shellBroker.handleRequest(topic, fn)` is invoked by the shell when a
+*frame* posts a request with `target: 'shell'` (see
+`web/broker.js#handleShellRequest`). The broker resolves the target
+window via `resolveTargetWindow`, which returns `null` for
+`target === 'shell'` (the shell is not a registered iframe service in
+its own registry) — so shell-side code calling
+`shellBroker.request('shell.queryIndex', payload, { target: 'shell' })`
+throws `Cannot resolve target window for message topic: <topic>`
+(`web/broker.js:396`).
+
+When the shell itself needs the data behind a `shell.queryXxx`
+handler — e.g. `web/shell/search.js` powering the top-bar search
+popover — call `ShellCatalogService` (or whichever shell-local object
+backs the handler) directly. Bypassing the broker for shell-internal
+callers avoids the self-routing trap and saves a postMessage round
+trip. Frames keep using `broker.request('shell.<topic>', ...)` exactly
+as they do today.
 
 ## 9. Security baseline
 

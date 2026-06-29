@@ -37,8 +37,26 @@ export function updateNowPlayingMeta(track) {
     }
     if (els.trackMeta) {
         const artistLabel = track && typeof track.artist === 'string' ? track.artist.trim() : '';
-        els.trackMeta.textContent = game;
-        if (artistLabel) els.trackMeta.textContent += ' - ' + artistLabel;
+        const gameId = track && typeof track.gameId === 'string' ? track.gameId.trim() : '';
+
+        while (els.trackMeta.firstChild) {
+            els.trackMeta.removeChild(els.trackMeta.firstChild);
+        }
+
+        if (gameId) {
+            const gameLink = document.createElement('a');
+            gameLink.href = '/games/' + encodeURIComponent(gameId);
+            gameLink.setAttribute('data-router-link', '');
+            gameLink.className = 'track-meta-game';
+            gameLink.textContent = game;
+            els.trackMeta.appendChild(gameLink);
+        } else {
+            els.trackMeta.appendChild(document.createTextNode(game));
+        }
+
+        if (artistLabel) {
+            els.trackMeta.appendChild(document.createTextNode(' · ' + artistLabel));
+        }
     }
 
     syncMediaSessionMetadataFn(track);
@@ -68,7 +86,28 @@ export function updateNowPlayingThumb(track) {
 
 export function setStatus(message) {
     if (els.status) {
-        els.status.textContent = message;
+        while (els.status.firstChild) {
+            els.status.removeChild(els.status.firstChild);
+        }
+
+        const currentIndex = getCurrentIndex();
+        const tracks = getTracks();
+        const hasCurrentTrack = Number.isInteger(currentIndex)
+            && currentIndex >= 0
+            && Array.isArray(tracks)
+            && currentIndex < tracks.length
+            && tracks[currentIndex];
+
+        if (hasCurrentTrack) {
+            const statusLink = document.createElement('a');
+            statusLink.href = '/now-playing';
+            statusLink.setAttribute('data-router-link', '');
+            statusLink.className = 'status-link';
+            statusLink.textContent = message;
+            els.status.appendChild(statusLink);
+        } else if (message) {
+            els.status.appendChild(document.createTextNode(message));
+        }
     }
 
     if (!broker) return;

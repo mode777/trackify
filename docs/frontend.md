@@ -27,6 +27,7 @@ output is `build/dist/`. Four HTML entry points are emitted
 | `build.outDir`      | `build/dist`                           | Vite's final output (also the `Dockerfile` source).             |
 | `build.emptyOutDir` | `!isWatchBuild`                        | Preserve existing outputs during `vite build --watch` for stable iteration. |
 | `build.watch`       | `{}` only when `--watch` is passed     | Drives `npm run build:watch` / `npm run build:watch-js`.        |
+| `build.sourcemap`   | `true` only when `--watch` is passed   | Emit source maps during watch builds to aid debugging.         |
 
 The dev server binds `127.0.0.1` only (not `0.0.0.0`) — there is no
 LAN-accessible dev server.
@@ -81,6 +82,14 @@ Mounted from `web/playlist.html`. Queries the shell with
 and writes via `shell.addTrackToPlaylist` /
 `shell.removeTrackFromPlaylist`. Publishes `playlist.liked` /
 `playlist.unliked` events so the shell can sync favorites.
+
+The same frame also hosts the **now-playing view** (route
+`/now-playing` → `playlist.html#?now-playing`): it mirrors the
+player's current queue by issuing `player.getCurrentPlaylist` on init
+(see [`docs/ui.md`](ui.md#75-playergetcurrentplaylist-payload)) and
+applies a dedicated hero state (eyebrow `PLAYER`, title `Now Playing`,
+gold accent `#f7c948`, play icon in front of the hero background).
+The hash parser routes the view in `evaluateFragmentParameters()`.
 
 ## 4. Player frame (`#playerFrame`)
 

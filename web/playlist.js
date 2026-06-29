@@ -21,10 +21,12 @@ import {
     publishSelected,
     playCurrentSelection,
     applyIndexPayload,
+    applyNowPlayingSnapshot,
     setCurrentPlaylist,
     setPlayerReady,
     flushPendingSelection,
     handlePlayerTrackChanged,
+    requestCurrentPlaylistFromPlayer,
 } from './playlist/playlist_state.js';
 import { initAuthState, applyAuthUser, getCurrentUser } from './playlist/auth_state.js';
 import {
@@ -32,6 +34,7 @@ import {
     queryFavorites,
     getFavoriteTrackIds,
     applyUserToggle,
+    applyShellFavoriteChange,
 } from './playlist/favorites_service.js';
 import {
     initHeroUi,
@@ -39,6 +42,8 @@ import {
     applyFavoritesHeroState,
     applyPlaylistHeroState,
     clearFavoritesHeroState,
+    applyNowPlayingHeroState,
+    applyArtistHeroState,
     setHeroMetadata,
 } from './playlist/hero_ui.js';
 import {
@@ -74,6 +79,15 @@ function handleUserToggleFavorite(trackId, wasFavorite) {
     refreshFavoriteIcons();
 }
 
+function resetScroll() {
+    if (typeof window === 'undefined' || !window) return;
+    try {
+        window.scrollTo(0, 0);
+    } catch (_error) {
+        // Older browsers / locked contexts — ignore.
+    }
+}
+
 function bindPlayUi() {
     if (els.playButton) {
         els.playButton.addEventListener('click', playCurrentSelection);
@@ -87,6 +101,7 @@ function bindBrokerHandlers() {
     broker.subscribe('player.ready', () => {
         setPlayerReady(true);
         flushPendingSelection();
+        requestCurrentPlaylistFromPlayer();
     });
 
     broker.subscribe('player.stateChanged', ({ payload }) => {
@@ -108,7 +123,13 @@ function bindBrokerHandlers() {
         applyAuthUser(payload);
     });
 
+    broker.subscribe('shell.favorites.changed', ({ payload }) => {
+        applyShellFavoriteChange(payload && payload.trackId, payload && payload.isFavorite === true);
+        refreshFavoriteIcons();
+    });
+
     broker.subscribe(CONTENT_RERENDER_TOPIC, () => {
+        resetScroll();
         evaluateFragmentParameters();
     });
 }
@@ -194,8 +215,8 @@ function init() {
 
     initNavigation({
         shellClient,
-        heroUi: { updateHeroArt, applyFavoritesHeroState, applyPlaylistHeroState, clearFavoritesHeroState, setHeroMetadata },
-        playlistState: { applyIndexPayload },
+        heroUi: { updateHeroArt, applyFavoritesHeroState, applyPlaylistHeroState, clearFavoritesHeroState, applyNowPlayingHeroState, applyArtistHeroState, setHeroMetadata },
+        playlistState: { applyIndexPayload, applyNowPlayingSnapshot, requestCurrentPlaylistFromPlayer },
         favoritesService: { queryFavorites },
         setStatus,
     });
@@ -210,6 +231,7 @@ function init() {
     });
 
     window.addEventListener('hashchange', () => {
+        resetScroll();
         console.info('[trace][iframe:playlist] hashchange fired', {
             href: window.location.href,
             historyLength: window.history.length,

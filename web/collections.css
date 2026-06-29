@@ -14,6 +14,14 @@
 
 .collections-header {
     margin-bottom: 22px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.collections-header-text {
+    min-width: 0;
 }
 
 .eyebrow {
@@ -44,6 +52,109 @@
     margin: 10px 0 0;
     color: var(--muted);
     font-size: 0.86rem;
+}
+
+.collections-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    min-width: 220px;
+    max-width: 320px;
+    flex: 0 1 320px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--panel-low) 88%, transparent);
+    color: var(--text);
+    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.collections-filter:hover {
+    border-color: color-mix(in srgb, var(--accent-soft) 35%, var(--line));
+}
+
+.collections-filter:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    background: var(--panel-low);
+}
+
+.collections-filter-icon {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.collections-filter:focus-within .collections-filter-icon {
+    color: var(--accent);
+}
+
+.collections-filter-input {
+    appearance: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.92rem;
+    padding: 0;
+}
+
+.collections-filter-input::placeholder {
+    color: var(--muted);
+}
+
+.collections-filter-input::-webkit-search-decoration,
+.collections-filter-input::-webkit-search-cancel-button,
+.collections-filter-input::-webkit-search-results-button,
+.collections-filter-input::-webkit-search-results-decoration {
+    appearance: none;
+}
+
+.collections-filter-clear {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    width: 22px;
+    height: 22px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 140ms ease, background 140ms ease;
+}
+
+.collections-filter-clear:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent-soft) 28%, transparent);
+}
+
+.collections-filter-clear:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 75%, white);
+    outline-offset: 2px;
+}
+
+.collections-filter-clear[hidden] {
+    display: none;
+}
+
+.collections-empty {
+    grid-column: 1 / -1;
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.94rem;
+    border: 1px dashed var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--panel-low) 50%, transparent);
 }
 
 .collections-grid {
@@ -257,12 +368,12 @@
     inset: 0;
     display: grid;
     place-items: center;
-    font-size: clamp(72px, 14vw, 120px);
+    font-size: clamp(96px, 18vw, 156px);
     line-height: 1;
     color: var(--playlist-accent, #fff);
-    opacity: 0.4;
+    opacity: 0.42;
     pointer-events: none;
-    text-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    text-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
     z-index: 0;
 }
 
@@ -328,6 +439,17 @@
     .collections-root {
         width: min(100vw, 100%);
         padding: 16px 0 24px;
+    }
+
+    .collections-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+    }
+
+    .collections-filter {
+        max-width: none;
+        flex: 1 1 auto;
     }
 
     .collections-grid {

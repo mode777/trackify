@@ -6,9 +6,11 @@
  *   #?game=<name>             — game album view
  *   #?favorites               — current user's favorites
  *   #?playlist&id=<id>        — playlist by id
- *   #?artist=<name>           — (currently routes to the game view;
- *                               shell-side hero metadata isn't
- *                               populated for artists today)
+ *   #?now-playing             — mirror of the player's current queue
+ *   #?artist=<name>           — all tracks by the named artist; hero
+ *                               is rendered by hero_ui.applyArtistHeroState
+ *                               and tracks are loaded through
+ *                               shell.queryIndex({ artist })
  *
  * Reacts to hashchange and runs evaluateFragmentParameters() on
  * init. Each route delegates to the appropriate shell_client method
@@ -66,6 +68,22 @@ export function evaluateFragmentParameters() {
         return;
     }
 
+    if (filters.nowPlaying) {
+        if (heroUi && typeof heroUi.applyNowPlayingHeroState === 'function') {
+            heroUi.applyNowPlayingHeroState();
+        }
+        loadNowPlayingQueue();
+        return;
+    }
+
+    if (typeof filters.artist === 'string' && filters.artist) {
+        if (heroUi && typeof heroUi.applyArtistHeroState === 'function') {
+            heroUi.applyArtistHeroState({ name: filters.artist });
+        }
+        queryIndex(filters);
+        return;
+    }
+
     if (heroUi && typeof heroUi.clearFavoritesHeroState === 'function') {
         heroUi.clearFavoritesHeroState();
     }
@@ -95,6 +113,8 @@ function getIndexFiltersFromFragment() {
     const favorites = params.has('favorites');
     const playlist = params.has('playlist');
     const playlistId = params.get('id');
+    const nowPlaying = params.has('now-playing');
+    const artist = params.get('artist');
 
     const filters = {};
     if (typeof game === 'string' && game.trim()) {
@@ -105,6 +125,12 @@ function getIndexFiltersFromFragment() {
     }
     if (playlist && typeof playlistId === 'string' && playlistId.trim()) {
         filters.playlist = playlistId.trim();
+    }
+    if (nowPlaying) {
+        filters.nowPlaying = true;
+    }
+    if (typeof artist === 'string' && artist.trim()) {
+        filters.artist = artist.trim();
     }
     return filters;
 }
@@ -123,6 +149,23 @@ async function loadFavoritesPlaylist() {
         console.error('Failed to load favorites playlist', error);
         playlistState.applyIndexPayload({ source: 'favorites', tracks: [], selectedIndex: -1 });
         setStatusFn('Error loading favorites (see console)');
+    }
+}
+
+async function loadNowPlayingQueue() {
+    if (!playlistState) return;
+    if (typeof playlistState.requestCurrentPlaylistFromPlayer !== 'function'
+        || typeof playlistState.applyNowPlayingSnapshot !== 'function') {
+        return;
+    }
+    try {
+        const snapshot = await playlistState.requestCurrentPlaylistFromPlayer();
+        const statusMessage = playlistState.applyNowPlayingSnapshot(snapshot);
+        if (typeof statusMessage === 'string') setStatusFn(statusMessage);
+    } catch (error) {
+        console.error('Failed to load now-playing queue', error);
+        playlistState.applyNowPlayingSnapshot(null);
+        setStatusFn('Error loading now-playing queue (see console)');
     }
 }
 

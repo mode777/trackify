@@ -286,7 +286,13 @@ export class ShellCatalogService {
 
     async queryIndex(filters) {
         let tracks = [];
-        if (filters.game){
+        if (filters.q) {
+            tracks = await this.loadTracksForQuery(filters.q);
+        } else if (filters.title) {
+            tracks = await this.loadTracksForTitle(filters.title);
+        } else if (filters.artist) {
+            tracks = await this.loadTracksForArtist(filters.artist);
+        } else if (filters.game){
             tracks = await this.loadTracksForGame(filters.game);
         } else {
             tracks = await this.loadTracks();
@@ -409,6 +415,39 @@ export class ShellCatalogService {
         return this.parseTracksManifest(records.items);
     }
 
+    async loadTracksForArtist(artist) {
+        if (typeof artist !== 'string' || !artist.trim()) {
+            return [];
+        }
+        const trimmed = artist.trim();
+        const filter = this.pb.filter('artist~{:pattern}', { pattern: trimmed });
+        const records = await this.pb.collection(TRACKS_COLLECTION).getList(1, 1000, { filter });
+        return this.parseTracksManifest(records.items);
+    }
+
+    async loadTracksForTitle(title) {
+        if (typeof title !== 'string' || !title.trim()) {
+            return [];
+        }
+        const trimmed = title.trim();
+        const filter = this.pb.filter('title~{:pattern}', { pattern: trimmed });
+        const records = await this.pb.collection(TRACKS_COLLECTION).getList(1, 1000, { filter, sort: 'title' });
+        return this.parseTracksManifest(records.items);
+    }
+
+    async loadTracksForQuery(query) {
+        if (typeof query !== 'string' || !query.trim()) {
+            return [];
+        }
+        const trimmed = query.trim();
+        const filter = this.pb.filter(
+            'title~{:pattern} || game~{:pattern} || artist~{:pattern}',
+            { pattern: trimmed }
+        );
+        const records = await this.pb.collection(TRACKS_COLLECTION).getList(1, 1000, { filter, sort: 'title' });
+        return this.parseTracksManifest(records.items);
+    }
+
     async loadGames() {
         const records = await this.pb.collection(GAMES_COLLECTION).getFullList();
         return this.parseGamesManifest(records);
@@ -430,6 +469,7 @@ export class ShellCatalogService {
                 title: entry.title.trim(),
                 platform: typeof entry.platform === 'string' ? entry.platform.trim() : '',
                 artist: this.normalizeArtist(entry.artist),
+                artists: this.normalizeArtists(entry.artist),
                 file: this.resolveFilename(entry, 'filename'),
                 gameId: typeof entry.gameId === 'string' ? entry.gameId.trim() : '',
                 coverArt: this.resolveFilename(entry, 'coverArt'),
@@ -581,6 +621,21 @@ export class ShellCatalogService {
                 .join(', ');
         }
         return '';
+    }
+
+    normalizeArtists(artist) {
+        if (Array.isArray(artist)) {
+            return artist
+                .filter((value) => typeof value === 'string')
+                .map((value) => value.trim())
+                .filter(Boolean);
+        }
+        if (typeof artist === 'string') {
+            const trimmed = artist.trim();
+            if (!trimmed) return [];
+            return trimmed.split(',').map((value) => value.trim()).filter(Boolean);
+        }
+        return [];
     }
 
     resolveFileField(record, fieldName) {

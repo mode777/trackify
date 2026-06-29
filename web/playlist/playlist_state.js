@@ -98,6 +98,9 @@ export function applyIndexPayload(payload) {
             platform: typeof track.platform === 'string' ? track.platform : '',
             game: typeof track.game === 'string' ? track.game : '',
             artist: typeof track.artist === 'string' ? track.artist : '',
+            artists: Array.isArray(track.artists)
+                ? track.artists.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
+                : [],
         }));
 
     if (!tracks.length) {
@@ -109,7 +112,62 @@ export function applyIndexPayload(payload) {
     const preferredIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : 0;
     currentIndex = Math.max(0, Math.min(tracks.length - 1, preferredIndex));
     onSelectionChangedFn();
+    requestCurrentPlaylistFromPlayer();
     return 'Playlist loaded';
+}
+
+export async function requestCurrentPlaylistFromPlayer() {
+    if (!broker) return null;
+    try {
+        const response = await broker.request('player.getCurrentPlaylist', {}, { target: 'player' });
+        if (!response || typeof response !== 'object') return null;
+
+        const playerSource = typeof response.source === 'string' ? response.source : '';
+        const playerCurrentTrack = typeof response.currentTrack === 'string' ? response.currentTrack : '';
+
+        if (playerCurrentTrack && playerSource === playlistInfo.source) {
+            const newIndex = tracks.findIndex((track) => track && track.id === playerCurrentTrack);
+            if (newIndex >= 0 && newIndex !== currentIndex) {
+                currentIndex = newIndex;
+                onSelectionChangedFn();
+            }
+        }
+
+        return response;
+    } catch (_error) {
+        // Player not ready, not registered, or request timed out — ignore silently.
+        return null;
+    }
+}
+
+export function applyNowPlayingSnapshot(snapshot) {
+    const source = snapshot && typeof snapshot.source === 'string' ? snapshot.source : '';
+    const rawTracks = snapshot && Array.isArray(snapshot.tracks) ? snapshot.tracks : [];
+
+    playlistInfo = { source };
+
+    tracks = rawTracks
+        .filter((track) => track && typeof track.title === 'string' && typeof track.file === 'string')
+        .map((track) => ({
+            ...track,
+            platform: typeof track.platform === 'string' ? track.platform : '',
+            game: typeof track.game === 'string' ? track.game : '',
+            artist: typeof track.artist === 'string' ? track.artist : '',
+            artists: Array.isArray(track.artists)
+                ? track.artists.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
+                : [],
+        }));
+
+    if (!tracks.length) {
+        currentIndex = -1;
+        onSelectionChangedFn();
+        return 'Player queue is empty';
+    }
+
+    const preferredIndex = Number.isInteger(snapshot.selectedIndex) ? snapshot.selectedIndex : 0;
+    currentIndex = Math.max(0, Math.min(tracks.length - 1, preferredIndex));
+    onSelectionChangedFn();
+    return 'Now playing';
 }
 
 export function handlePlayerTrackChanged(currentTrackId) {

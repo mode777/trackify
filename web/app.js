@@ -12,6 +12,7 @@ import { createShellBroker } from './broker.js';
 import { ShellCatalogService } from './catalog_service.js';
 import { createRouter } from './router.js';
 import { createNavClient, NAVIGATION_REQUESTED_TOPIC, CONTENT_RERENDER_TOPIC } from './nav_client.js';
+import { bindSearchUi, closeSearchPopover } from './shell/search.js';
 
 const shellBroker = createShellBroker({
     serviceId: 'shell',
@@ -38,8 +39,48 @@ const authUiState = {
 function bindHistoryButtons() {
     const backButton = document.querySelector('[data-history-action="back"]');
     const forwardButton = document.querySelector('[data-history-action="forward"]');
-    if (backButton) backButton.disabled = true;
-    if (forwardButton) forwardButton.disabled = true;
+    if (!backButton || !forwardButton) return;
+
+    const historyState = { cursor: 0, stack: [] };
+
+    function refresh() {
+        backButton.disabled = historyState.cursor <= 0;
+        forwardButton.disabled = historyState.cursor >= historyState.stack.length - 1;
+    }
+
+    backButton.addEventListener('click', () => {
+        if (backButton.disabled) return;
+        router.back();
+    });
+    forwardButton.addEventListener('click', () => {
+        if (forwardButton.disabled) return;
+        router.forward();
+    });
+
+    router.subscribe('navigated', ({ to, cause }) => {
+        const url = to && typeof to.url === 'string' ? to.url : null;
+        if (!url) return;
+
+        if (cause === 'push' || cause === 'initial') {
+            historyState.stack = historyState.stack.slice(0, historyState.cursor + 1);
+            historyState.stack.push(url);
+            historyState.cursor = historyState.stack.length - 1;
+        } else if (cause === 'replace') {
+            if (historyState.stack.length === 0) {
+                historyState.stack.push(url);
+            } else {
+                historyState.stack[historyState.cursor] = url;
+            }
+        } else if (cause === 'pop' || cause === 'token') {
+            const idx = historyState.stack.indexOf(url);
+            if (idx >= 0) {
+                historyState.cursor = idx;
+            }
+        }
+        refresh();
+    });
+
+    refresh();
 }
 
 function makeAuthUserPayload() {
@@ -526,6 +567,9 @@ function registerRoutes() {
     router.register('/favorites', {
         target: { html: '/playlist.html', hash: '?favorites' },
     });
+    router.register('/now-playing', {
+        target: { html: '/playlist.html', hash: '?now-playing' },
+    });
     router.register('/my-library', {
         target: { html: '/collections.html', hash: '?type=playlists&playlistType=private' },
     });
@@ -578,10 +622,14 @@ function init() {
     bindAuthUi();
     bindHistoryButtons();
     bindCreatePlaylistButton();
+    bindSearchUi({ shellBroker, catalogService, navClient });
     bindShellMediaSessionHandlers();
     bindMediaKeyFallback();
     initBroker();
     initRouter();
+    router.subscribe('navigated', () => {
+        closeSearchPopover();
+    });
     if(pb.authStore.isValid) {
         setTimeout(() => {
             publishAuthLifecycleEvent('shell.user.login');

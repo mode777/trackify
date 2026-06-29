@@ -15,6 +15,10 @@
 'use strict';
 
 import { els } from './dom.js';
+import { ARTIST_ICON, paletteColorForArtist } from '../playlist_meta.js';
+
+const NOW_PLAYING_ACCENT = '#f7c948';
+const NOW_PLAYING_ICON = 'play_circle';
 
 let setCurrentPlaylistFn = () => {};
 let reevaluateEditStateFn = () => {};
@@ -82,6 +86,33 @@ function applyPlaylistHeroArt(playlist) {
     }
 }
 
+function applyArtistHeroArt(accent) {
+    if (!els.heroArt) return;
+
+    if (accent) {
+        els.heroArt.style.setProperty('--playlist-accent', accent);
+        els.heroArt.style.backgroundImage =
+            'linear-gradient(135deg, ' +
+            'color-mix(in srgb, ' + accent + ' 38%, #2a3354) 0%, ' +
+            'color-mix(in srgb, ' + accent + ' 18%, #1a2143) 55%, ' +
+            '#131a36 100%)';
+    } else {
+        els.heroArt.style.removeProperty('--playlist-accent');
+        els.heroArt.style.backgroundImage = '';
+    }
+
+    if (els.heroArtIcon) {
+        els.heroArtIcon.textContent = ARTIST_ICON;
+        if (accent) {
+            els.heroArtIcon.style.color = accent;
+            els.heroArtIcon.style.opacity = '0.4';
+        } else {
+            els.heroArtIcon.style.color = '';
+            els.heroArtIcon.style.opacity = '';
+        }
+    }
+}
+
 export function setHeroMetadata(gameEntry) {
     if (!gameEntry || typeof gameEntry !== 'object') return;
 
@@ -117,9 +148,43 @@ export function setHeroMetadata(gameEntry) {
     updateHeroArt(gameEntry.coverArt);
 }
 
+function applyNowPlayingHeroArt() {
+    if (!els.heroArt) return;
+
+    document.body.style.setProperty('--now-playing-accent', NOW_PLAYING_ACCENT);
+    els.heroArt.style.backgroundImage =
+        'linear-gradient(135deg, ' +
+        'color-mix(in srgb, ' + NOW_PLAYING_ACCENT + ' 38%, #2a3354) 0%, ' +
+        'color-mix(in srgb, ' + NOW_PLAYING_ACCENT + ' 18%, #1a2143) 55%, ' +
+        '#131a36 100%)';
+
+    if (els.heroPlayerIcon) {
+        els.heroPlayerIcon.textContent = NOW_PLAYING_ICON;
+    }
+
+    if (els.heroArtIcon) {
+        els.heroArtIcon.textContent = '';
+        els.heroArtIcon.style.color = '';
+        els.heroArtIcon.style.opacity = '';
+    }
+}
+
+function clearNowPlayingHeroArt() {
+    document.body.style.removeProperty('--now-playing-accent');
+    if (els.heroArt) {
+        els.heroArt.style.backgroundImage = '';
+    }
+    if (els.heroPlayerIcon) {
+        els.heroPlayerIcon.textContent = '';
+    }
+}
+
 export function applyFavoritesHeroState() {
     document.body.classList.add('is-favorites');
     document.body.classList.remove('is-playlist');
+    document.body.classList.remove('is-now-playing');
+    document.body.classList.remove('is-artist');
+    clearNowPlayingHeroArt();
     applyPlaylistHeroArt(null);
     if (els.heroEyebrow) els.heroEyebrow.textContent = 'Playlist';
     if (els.heroTitle) els.heroTitle.textContent = 'Liked Tracks';
@@ -133,6 +198,9 @@ export function applyFavoritesHeroState() {
 export function applyPlaylistHeroState(playlist) {
     document.body.classList.add('is-playlist');
     document.body.classList.remove('is-favorites');
+    document.body.classList.remove('is-now-playing');
+    document.body.classList.remove('is-artist');
+    clearNowPlayingHeroArt();
 
     const normalized = playlist && typeof playlist === 'object' && typeof playlist.id === 'string' && playlist.id
         ? {
@@ -157,9 +225,50 @@ export function applyPlaylistHeroState(playlist) {
     reevaluateEditStateFn();
 }
 
+export function applyNowPlayingHeroState() {
+    document.body.classList.add('is-now-playing');
+    document.body.classList.remove('is-favorites');
+    document.body.classList.remove('is-playlist');
+    document.body.classList.remove('is-artist');
+    applyNowPlayingHeroArt();
+
+    if (els.heroEyebrow) els.heroEyebrow.textContent = 'Player';
+    if (els.heroTitle) els.heroTitle.textContent = 'Now Playing';
+    if (els.heroCompany) els.heroCompany.textContent = '';
+    if (els.heroYear) els.heroYear.textContent = '';
+    if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
+
+    setCurrentPlaylistFn(null);
+    reevaluateEditStateFn();
+}
+
+export function applyArtistHeroState(artist) {
+    document.body.classList.add('is-artist');
+    document.body.classList.remove('is-favorites');
+    document.body.classList.remove('is-playlist');
+    document.body.classList.remove('is-now-playing');
+    clearNowPlayingHeroArt();
+
+    const name = artist && typeof artist.name === 'string' ? artist.name.trim() : '';
+    const accent = name ? paletteColorForArtist(name) : '';
+    applyArtistHeroArt(accent);
+
+    if (els.heroEyebrow) els.heroEyebrow.textContent = 'Artist';
+    if (els.heroTitle) els.heroTitle.textContent = name || 'Artist';
+    if (els.heroCompany) els.heroCompany.textContent = name ? 'Tracks by ' + name : '';
+    if (els.heroYear) els.heroYear.textContent = '';
+    if (els.heroMetaDot) els.heroMetaDot.style.display = 'none';
+
+    setCurrentPlaylistFn(null);
+    reevaluateEditStateFn();
+}
+
 export function clearFavoritesHeroState() {
     document.body.classList.remove('is-favorites');
     document.body.classList.remove('is-playlist');
+    document.body.classList.remove('is-now-playing');
+    document.body.classList.remove('is-artist');
+    clearNowPlayingHeroArt();
     applyPlaylistHeroArt(null);
     if (els.heroEyebrow) els.heroEyebrow.textContent = 'Game';
     setCurrentPlaylistFn(null);

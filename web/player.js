@@ -8,6 +8,7 @@
 'use strict';
 
 import { createFrameBroker } from './broker.js';
+import { createNavClient } from './nav_client.js';
 
 import { els } from './player/dom.js';
 import {
@@ -46,6 +47,7 @@ import {
     isBusy,
     getLastPlaybackState,
     isShuffleEnabled,
+    getCurrentPlaylist,
 } from './player/transport.js';
 
 const broker = createFrameBroker({
@@ -54,6 +56,8 @@ const broker = createFrameBroker({
     requestTimeoutMs: 4000,
     allowedOrigins: [window.location.origin],
 });
+
+const navClient = createNavClient({ broker });
 
 function nextTrack() {
     selectNextTrack(true);
@@ -76,6 +80,8 @@ function bindPlayPauseUi() {
 }
 
 function bindBrokerHandlers() {
+    broker.handleRequest('player.getCurrentPlaylist', () => getCurrentPlaylist());
+
     broker.subscribe('playlist.selected', ({ payload }) => {
         const autoplay = payload && payload.autoplay === true;
         handlePlaylistSelected(payload, autoplay);
@@ -153,6 +159,8 @@ function init() {
     bindMediaSessionHandlers();
 
     bindBrokerHandlers();
+
+    navClient.bindLinks(document.body);
 
     broker.start();
     broker.publish('player.ready', {

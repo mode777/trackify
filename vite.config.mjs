@@ -13,6 +13,7 @@ export default defineConfig({
     emptyOutDir: !isWatchBuild,
     watch: isWatchBuild ? {} : null,
     minify: isWatchBuild ? false : 'esbuild',
+    sourcemap: isWatchBuild,
     rollupOptions: {
       input: {
         main: path.resolve(rootDir, 'index.html'),

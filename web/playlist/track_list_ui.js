@@ -79,7 +79,39 @@ export function renderTracks() {
 
         const game = document.createElement('span');
         game.className = 'track-artist';
-        game.textContent = track.artist || track.game || PLACEHOLDER_GAME;
+        const gameLabel = typeof track.game === 'string' && track.game.trim() ? track.game.trim() : PLACEHOLDER_GAME;
+        const gameId = typeof track.gameId === 'string' ? track.gameId.trim() : '';
+        const artistNames = Array.isArray(track.artists) && track.artists.length > 0
+            ? track.artists.filter((value) => typeof value === 'string' && value.trim())
+            : (typeof track.artist === 'string' && track.artist.trim()
+                ? track.artist.split(',').map((value) => value.trim()).filter(Boolean)
+                : []);
+
+        if (gameId) {
+            const gameLink = document.createElement('a');
+            gameLink.href = '/games/' + encodeURIComponent(gameId);
+            gameLink.setAttribute('data-router-link', '');
+            gameLink.className = 'track-artist-game';
+            gameLink.textContent = gameLabel;
+            game.appendChild(gameLink);
+        } else {
+            game.appendChild(document.createTextNode(gameLabel));
+        }
+
+        if (artistNames.length > 0) {
+            game.appendChild(document.createTextNode(' \u00b7 '));
+            artistNames.forEach((name, index) => {
+                if (index > 0) {
+                    game.appendChild(document.createTextNode(', '));
+                }
+                const artistLink = document.createElement('a');
+                artistLink.href = '/artists/' + encodeURIComponent(name);
+                artistLink.setAttribute('data-router-link', '');
+                artistLink.className = 'track-artist-name';
+                artistLink.textContent = name;
+                game.appendChild(artistLink);
+            });
+        }
 
         meta.append(name, game);
 

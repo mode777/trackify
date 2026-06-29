@@ -61,3 +61,13 @@ export function applyUserToggle(trackId, wasFavorite) {
         broker.publish('playlist.liked', { trackId }, { target: 'shell' });
     }
 }
+
+export function applyShellFavoriteChange(trackId, isFavorite) {
+    if (typeof trackId !== 'string' || !trackId) return;
+
+    if (isFavorite) {
+        favoriteTrackIds.add(trackId);
+    } else {
+        favoriteTrackIds.delete(trackId);
+    }
+}

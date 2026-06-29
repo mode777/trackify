@@ -15,9 +15,30 @@
 <body class="collections-page">
 <main class="collections-root">
     <section class="collections-header" aria-label="Collections overview">
-        <p class="eyebrow">Browse</p>
-        <h2>Library</h2>
-        <p id="collectionsStatus" class="shell-status">Waiting for library...</p>
+        <div class="collections-header-text">
+            <p class="eyebrow">Browse</p>
+            <h2>Library</h2>
+            <p id="collectionsStatus" class="shell-status">Waiting for library...</p>
+        </div>
+        <div class="collections-filter" role="search">
+            <span class="collections-filter-icon material-symbols-outlined" aria-hidden="true">search</span>
+            <input
+                id="collectionsFilterInput"
+                type="search"
+                class="collections-filter-input"
+                placeholder="Filter by title"
+                aria-label="Filter collections by title"
+                autocomplete="off"
+                spellcheck="false"
+            />
+            <button
+                id="collectionsFilterClear"
+                type="button"
+                class="collections-filter-clear material-symbols-outlined"
+                aria-label="Clear filter"
+                hidden
+            >close</button>
+        </div>
     </section>
 
     <section id="collectionsHero" class="collections-hero" hidden aria-label="Favorites shortcut">

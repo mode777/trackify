@@ -11,6 +11,7 @@
 export const els = {
     heroArt: document.querySelector('.hero-art'),
     heroArtIcon: document.querySelector('.hero-playlist-icon'),
+    heroPlayerIcon: document.querySelector('.hero-player-icon'),
     heroEyebrow: document.getElementById('heroEyebrow'),
     heroTitle: document.getElementById('heroTitle'),
     heroEditButton: document.getElementById('heroEditButton'),

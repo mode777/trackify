@@ -11,6 +11,7 @@
 
 import { createFrameBroker } from './broker.js';
 import { createNavClient, CONTENT_RERENDER_TOPIC } from './nav_client.js';
+import { ARTIST_ICON, paletteColorForArtist } from './playlist_meta.js';
 
 const VALID_COLLECTION_TYPES = new Set(['games', 'playlists', 'platforms', 'artists']);
 const DEFAULT_TYPE = 'games';
@@ -23,6 +24,8 @@ const els = {
     eyebrow: document.querySelector('.eyebrow'),
     heading: document.querySelector('.collections-header h2'),
     hero: document.getElementById('collectionsHero'),
+    filterInput: document.getElementById('collectionsFilterInput'),
+    filterClear: document.getElementById('collectionsFilterClear'),
 };
 
 const broker = createFrameBroker({
@@ -43,6 +46,7 @@ const stores = {
 
 let activeType = DEFAULT_TYPE;
 let activePlaylistType = '';
+let filterText = '';
 
 function setStatus(message) {
     if (!els.status) return;
@@ -250,7 +254,7 @@ function handlePlayAction(event, item) {
     case 'games':
         return playGame(item);
     case 'playlists':
-        return openPlaylistView(item.id);
+        return playPlaylist(item);
     default:
         return;
     }
@@ -306,6 +310,50 @@ async function playGame(game) {
     } catch (error) {
         console.error('Failed to query shell index for game playback', error);
         setStatus('Error loading sample-files/index.json (see console)');
+    }
+}
+
+async function playPlaylist(playlist) {
+    if (!playlist || typeof playlist.id !== 'string' || !playlist.id.trim()) return;
+
+    const playlistId = playlist.id.trim();
+    const playlistTitle = itemTitle(playlist);
+
+    setStatus('Loading tracks for ' + playlistTitle + '...');
+
+    try {
+        const payload = await broker.request('shell.queryPlaylist', { id: playlistId }, {
+            target: 'shell',
+            timeoutMs: 15000,
+        });
+
+        if (!payload || (typeof payload.error === 'string' && payload.error)) {
+            setStatus(payload && typeof payload.error === 'string' && payload.error
+                ? payload.error
+                : 'No playlist payload returned');
+            return;
+        }
+
+        const tracks = Array.isArray(payload.tracks)
+            ? payload.tracks.filter((track) => track && typeof track.title === 'string' && typeof track.file === 'string')
+            : [];
+
+        if (!tracks.length) {
+            setStatus('No tracks found in ' + playlistTitle);
+            return;
+        }
+
+        broker.publish('playlist.selected', {
+            source: 'playlist:' + playlistId,
+            selectedIndex: 0,
+            tracks,
+            autoplay: true,
+        }, { target: 'player' });
+
+        setStatus('Now playing ' + playlistTitle);
+    } catch (error) {
+        console.error('Failed to query playlist for playback', error);
+        setStatus('Error loading playlist (see console)');
     }
 }
 
@@ -374,6 +422,7 @@ function renderCard(item) {
     const cover = document.createElement('div');
     cover.className = 'collection-cover';
     const isPlaylistArt = activeType === 'playlists';
+    const isArtistArt = activeType === 'artists';
     if (isPlaylistArt) {
         cover.classList.add('is-playlist-art');
         if (typeof item.color === 'string' && item.color) {
@@ -386,6 +435,17 @@ function renderCard(item) {
             icon.setAttribute('aria-hidden', 'true');
             cover.appendChild(icon);
         }
+    } else if (isArtistArt) {
+        cover.classList.add('is-playlist-art');
+        const accent = paletteColorForArtist(itemTitle(item));
+        if (accent) {
+            cover.style.setProperty('--playlist-accent', accent);
+        }
+        const icon = document.createElement('span');
+        icon.className = 'collection-art-icon material-symbols-outlined filled';
+        icon.textContent = ARTIST_ICON;
+        icon.setAttribute('aria-hidden', 'true');
+        cover.appendChild(icon);
     } else {
         const coverUrl = itemCoverUrl(item);
         if (coverUrl) {
@@ -437,15 +497,40 @@ function renderCard(item) {
     return li;
 }
 
+function visibleItems() {
+    const items = stores[activeType] || [];
+    const needle = filterText.trim().toLowerCase();
+    if (!needle) return items;
+    return items.filter((item) => itemTitle(item).toLowerCase().includes(needle));
+}
+
+function renderEmptyState(message) {
+    const li = document.createElement('li');
+    li.className = 'collections-empty';
+    li.textContent = message;
+    return li;
+}
+
 function renderItems() {
     if (!els.grid) return;
 
     els.grid.innerHTML = '';
 
-    const items = stores[activeType] || [];
-    for (const item of items) {
-        els.grid.appendChild(renderCard(item));
+    const items = visibleItems();
+    if (items.length) {
+        for (const item of items) {
+            els.grid.appendChild(renderCard(item));
+        }
+        return;
     }
+
+    const total = (stores[activeType] || []).length;
+    const needle = filterText.trim();
+    els.grid.appendChild(renderEmptyState(
+        total && needle
+            ? 'No ' + activeType + ' match "' + needle + '"'
+            : 'No ' + activeType + ' found'
+    ));
 }
 
 /* ── Data handling ── */
@@ -469,12 +554,20 @@ function loadItems(payload) {
 
     renderItems();
 
-    if (!stores[activeType].length) {
+    const total = stores[activeType].length;
+    if (!total) {
         setStatus('No ' + activeType + ' found');
         return;
     }
 
-    setStatus('Loaded ' + stores[activeType].length + ' ' + activeType);
+    const visible = visibleItems().length;
+    const needle = filterText.trim();
+    if (needle) {
+        setStatus('Showing ' + visible + ' of ' + total + ' ' + activeType + ' matching "' + needle + '"');
+        return;
+    }
+
+    setStatus('Loaded ' + total + ' ' + activeType);
 }
 
 /* ── Query dispatch ── */
@@ -544,9 +637,65 @@ function applyRoute() {
     fetchItems();
 }
 
+function setFilter(nextValue) {
+    const next = typeof nextValue === 'string' ? nextValue : '';
+    if (next === filterText) {
+        updateFilterUi();
+        return;
+    }
+    filterText = next;
+    updateFilterUi();
+    renderItems();
+    const total = (stores[activeType] || []).length;
+    if (!total) return;
+    const visible = visibleItems().length;
+    const needle = filterText.trim();
+    if (!needle) {
+        setStatus('Loaded ' + total + ' ' + activeType);
+    } else {
+        setStatus('Showing ' + visible + ' of ' + total + ' ' + activeType + ' matching "' + needle + '"');
+    }
+}
+
+function updateFilterUi() {
+    if (!els.filterClear) return;
+    els.filterClear.hidden = !filterText.trim();
+}
+
+function clearFilter() {
+    if (!els.filterInput) return;
+    els.filterInput.value = '';
+    setFilter('');
+    els.filterInput.focus();
+}
+
+function bindFilter() {
+    if (!els.filterInput) return;
+
+    els.filterInput.addEventListener('input', (event) => {
+        setFilter(event.target.value || '');
+    });
+
+    els.filterInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && filterText) {
+            event.preventDefault();
+            clearFilter();
+        }
+    });
+
+    if (els.filterClear) {
+        els.filterClear.addEventListener('click', () => {
+            clearFilter();
+        });
+    }
+
+    updateFilterUi();
+}
+
 function init() {
     broker.start();
     navClient.bindLinks();
+    bindFilter();
     updateHeader();
     updateHero();
     setStatus('Waiting for library...');

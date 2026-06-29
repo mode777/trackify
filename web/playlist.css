@@ -97,6 +97,39 @@
     display: grid;
 }
 
+.is-artist .hero-playlist-icon {
+    display: grid;
+}
+
+.hero-player-icon {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-items: center;
+    font-size: 168px;
+    line-height: 1;
+    color: var(--now-playing-accent);
+    pointer-events: none;
+    text-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    opacity: 0.85;
+}
+
+.is-now-playing .hero-player-icon {
+    display: grid;
+}
+
+.is-now-playing .hero-art {
+    background:
+        linear-gradient(135deg,
+            color-mix(in srgb, var(--now-playing-accent) 38%, #2a3354) 0%,
+            color-mix(in srgb, var(--now-playing-accent) 18%, #1a2143) 55%,
+            #131a36 100%);
+}
+
+.is-now-playing .hero-text .eyebrow {
+    color: var(--now-playing-accent);
+}
+
 .hero-art:focus-visible {
     outline: 2px solid #f3c85c;
     outline-offset: 4px;
@@ -150,6 +183,10 @@
     align-items: center;
     justify-content: center;
     transition: color 120ms ease, background-color 120ms ease;
+}
+
+.hero-edit-button[hidden] {
+    display: none;
 }
 
 .hero-edit-button:hover,
@@ -714,6 +751,28 @@
     overflow: hidden;
     color: var(--muted);
     font-size: 0.78rem;
+}
+
+.track-artist .track-artist-game {
+    color: inherit;
+    text-decoration: none;
+}
+
+.track-artist .track-artist-game:hover,
+.track-artist .track-artist-game:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
+}
+
+.track-artist .track-artist-name {
+    color: inherit;
+    text-decoration: none;
+}
+
+.track-artist .track-artist-name:hover,
+.track-artist .track-artist-name:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
 }
 
 .track-list li:hover {
