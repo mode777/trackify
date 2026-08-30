@@ -108,6 +108,17 @@ Tags are bare versions (`v1.2.3`, `0.1.0`, etc.) — no `latest`, no
 date stamps, no build numbers. A new tag is the only release
 artefact; rolling back means re-pushing the previous tag's image.
 
+### CI release path
+
+Pushing a `v*` git tag triggers [.github/workflows/release.yml](../.github/workflows/release.yml),
+which builds the static site (same steps as `ci.yml`: submodules,
+emsdk, ninja, `npm run build` + `verify:dist`), logs into Harbor via
+`docker/login-action` using the `HARBOR_USERNAME` / `HARBOR_PASSWORD`
+repo secrets, then runs `./publish.sh "${GITHUB_REF_NAME#v}"` — the
+leading `v` is stripped, so git tag `v0.5.3` publishes image tag
+`0.5.3`. `publish.sh` stays the single source of truth for the
+`buildx` invocation.
+
 ## 4. Release checklist
 
 ```bash
@@ -124,6 +135,8 @@ ls build/dist/wasm/           # 5 .js + 3 .js backends + 5 .wasm files
 
 # 4. Publish
 ./publish.sh <version>
+#    … or just push the release tag and let CI do steps 2–4:
+#    git tag v<version> && git push origin v<version>
 
 # 5. Smoke-test the pushed image locally (pulls back from Harbor)
 docker run --rm -p 8090:8090 harbor.alexklingenbeck.de/my/trackify:<version>
