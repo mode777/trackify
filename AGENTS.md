@@ -221,6 +221,14 @@ the release entry point: builds the image via `docker buildx` for
 `harbor.alexklingenbeck.de/my/trackify:<version>`. Requires `set -e`
 and the version arg.
 
+Tagging behavior: pushing a `v*` git tag triggers
+`.github/workflows/release.yml`, which builds the static site (same
+steps as `ci.yml`), logs into Harbor with the `HARBOR_USERNAME` /
+`HARBOR_PASSWORD` repo secrets, and runs
+`./publish.sh "${GITHUB_REF_NAME#v}"` — the leading `v` is stripped,
+so git tag `v0.5.3` publishes image tag `0.5.3`. Only `v*` tags
+release; plain commits and other tags never push images.
+
 Full reference (build context, base-image assumptions, runtime data
 persistence, release checklist) lives in [`docs/deploy.md`](docs/deploy.md).
 
