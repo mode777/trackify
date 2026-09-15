@@ -254,3 +254,17 @@ persistence, release checklist) lives in [`docs/deploy.md`](docs/deploy.md).
   matched submodule paths at build time. Do not modify submodule contents.
 - `vite.config.mjs` sets `emptyOutDir: !isWatchBuild` so `vite build
   --watch` does not wipe prior outputs between iterations.
+
+## OpenSpec (spec-driven development)
+
+OpenSpec (`@fission-ai/openspec`, devDependency) manages spec-driven
+change proposals under `openspec/`. Project context shown to agents
+when authoring artifacts lives in `openspec/config.yaml`.
+
+- Propose a change: `/opsx-propose "idea"` (OpenCode) or
+  `npx openspec` workflows; specs live in `openspec/specs/`, active
+  change proposals in `openspec/changes/`, completed ones are archived
+  to `openspec/changes/archive/`.
+- Validate before archiving: `npx openspec validate --all`.
+- Shared skill definitions are in `.agents/skills/`; the OpenCode
+  adapter lives in `.opencode/` (`opsx-*` commands).

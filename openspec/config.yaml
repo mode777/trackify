@@ -1,0 +1,37 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  Trackify: VGM (video game music) web player. Hybrid build:
+  - CMake + Emscripten → WASM backend cores (psx, snes, nez, n64, vgm) exposing the `emu_*` ABI
+  - Node + Vite multi-page UI rooted at `web/` (shell + per-page iframes)
+  - PocketBase for catalog metadata (`pb_migrations/` schema, `pb_hooks/` server hooks)
+  - All inter-frame communication goes through `web/broker.js` with a versioned envelope
+  Role routing: data engineer (PocketBase + broker), UI engineer (shell/frames/CSS),
+  audio engineer (player, backends, build glue) — see AGENTS.md.
+  No test framework, linter, or formatter configured; `tools/*.mjs` are CLI utilities.
+  Reference docs: README.md, docs/ui.md, docs/database.md, docs/audio-backends.md,
+  docs/frontend.md, docs/tools.md, docs/deploy.md.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
