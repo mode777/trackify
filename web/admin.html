@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Trackify Admin</title>
+    <link rel="stylesheet" href="/admin.css" />
+  </head>
+  <body>
+    <header class="admin-header">
+      <h1>Trackify Admin</h1>
+      <div id="session-box" class="session-box" hidden>
+        <span id="session-identity"></span>
+        <button id="logout-btn" type="button">Log out</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Shown when no valid superuser session exists -->
+      <section id="login-view" class="card login-view">
+        <h2>Superuser sign-in</h2>
+        <p class="muted">Catalog management requires a PocketBase superuser session.</p>
+        <form id="login-form">
+          <label for="login-email">Email</label>
+          <input id="login-email" name="email" type="email" autocomplete="username" required />
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+          <button type="submit" id="login-submit">Sign in</button>
+          <p id="login-error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <!-- Shown only with a valid superuser session -->
+      <section id="admin-view" hidden>
+        <div class="card">
+          <h2>1. Select files</h2>
+          <div class="select-row">
+            <label class="file-label">
+              <input id="folder-input" type="file" webkitdirectory multiple />
+              Select folder
+            </label>
+            <label class="file-label">
+              <input id="files-input" type="file" multiple />
+              Select files
+            </label>
+            <button id="clear-staged" type="button">Clear staged</button>
+          </div>
+          <p class="muted">
+            Folder layout convention: <code>&lt;platform&gt;/&lt;game&gt;/&lt;files&gt;</code>
+            (e.g. <code>psx/final-fantasy-ix/101 - Title.psf</code>).
+          </p>
+        </div>
+
+        <div class="card" id="ungrouped-card" hidden>
+          <h2>Ungrouped files</h2>
+          <p class="muted">
+            These files are outside the <code>&lt;platform&gt;/&lt;game&gt;/</code> convention.
+            Assign each to a staged game (sidecars are bundled without a track row).
+          </p>
+          <ul id="ungrouped-list" class="ungrouped-list"></ul>
+        </div>
+
+        <div class="card" id="staging-card" hidden>
+          <h2>2. Review &amp; edit</h2>
+          <div id="staging-root"></div>
+          <div class="actions-row">
+            <button id="probe-btn" type="button">Probe metadata</button>
+            <button id="upload-btn" type="button" disabled>Start upload</button>
+            <span id="staging-status" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="card" id="upload-card" hidden>
+          <h2>3. Upload</h2>
+          <div class="actions-row">
+            <button id="retry-failed-btn" type="button" hidden>Retry failed</button>
+            <button id="resume-btn" type="button" hidden>Resume upload</button>
+            <span id="upload-summary" class="muted"></span>
+          </div>
+          <div id="upload-progress"></div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/admin.js"></script>
+  </body>
+</html>

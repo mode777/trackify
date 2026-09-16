@@ -1,0 +1,345 @@
+/*
+ * Trackify admin page styling. Standalone page — intentionally not part of
+ * the shell/iframe app, but visually adjacent (same palette).
+ */
+:root {
+    color-scheme: dark;
+    --bg: #0b1326;
+    --panel-low: #131b2e;
+    --panel: #171f33;
+    --panel-high: #222a3d;
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #dae2fd;
+    --muted: #99a4c9;
+    --accent: #4cd7f6;
+    --danger: #f66d6d;
+    --ok: #6ddc8f;
+    --warn: #f7c948;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(76, 215, 246, 0.12), transparent 55%),
+        radial-gradient(900px 500px at 90% 10%, rgba(124, 58, 237, 0.18), transparent 60%),
+        var(--bg);
+    background-repeat: no-repeat, no-repeat, repeat;
+    color: var(--text);
+    font-family: Inter, sans-serif;
+    min-height: 100vh;
+}
+
+.admin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--panel-low) 92%, transparent);
+}
+
+.admin-header h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.04em;
+}
+
+.session-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.card {
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+
+.card h2 {
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.error {
+    color: var(--danger);
+    font-size: 13px;
+}
+
+code {
+    background: var(--panel-high);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+input,
+select,
+button {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-high);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 10px;
+}
+
+button {
+    cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+input[type='file'] {
+    display: none;
+}
+
+.file-label,
+.select-row button,
+.actions-row button {
+    display: inline-block;
+    background: var(--panel-high);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+}
+
+.file-label:hover,
+.select-row button:hover:not(:disabled),
+.actions-row button:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+.select-row,
+.actions-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.actions-row {
+    margin-top: 14px;
+}
+
+.login-view {
+    max-width: 420px;
+    margin: 8vh auto 0;
+}
+
+.login-view form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ungrouped-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ungrouped-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    background: var(--panel-high);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.ungrouped-path {
+    flex: 1;
+    min-width: 200px;
+    word-break: break-all;
+}
+
+/* Staging: one section per game */
+.game-section {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 12px;
+    background: color-mix(in srgb, var(--panel-low) 70%, transparent);
+}
+
+.game-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.cover-box {
+    width: 84px;
+    min-height: 84px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    background: var(--panel-high);
+}
+
+.cover-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.game-fields {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px 12px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.field input,
+.field select {
+    width: 100%;
+}
+
+.sidecar-list {
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.track-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 13px;
+}
+
+.track-table th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--line);
+}
+
+.track-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+    vertical-align: middle;
+}
+
+.track-table input,
+.track-table .cell-filename {
+    width: 100%;
+    min-width: 90px;
+}
+
+.cell-filename {
+    color: var(--muted);
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.probe-state {
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.probe-state.ok { color: var(--ok); }
+.probe-state.fail { color: var(--warn); }
+.probe-state.pending { color: var(--muted); }
+.probe-state.active { color: var(--accent); }
+
+/* Upload progress */
+.upload-game {
+    margin-top: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+.upload-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: 13px;
+}
+
+.upload-item .item-label {
+    flex: 1;
+    word-break: break-all;
+    color: var(--text);
+}
+
+.upload-item .item-kind {
+    color: var(--muted);
+    font-size: 11px;
+    min-width: 52px;
+}
+
+.item-state {
+    min-width: 84px;
+    text-align: right;
+    font-size: 12px;
+}
+
+.item-state.pending { color: var(--muted); }
+.item-state.active { color: var(--accent); }
+.item-state.completed { color: var(--ok); }
+.item-state.skipped { color: var(--muted); }
+.item-state.failed { color: var(--danger); }
+
+.item-error {
+    color: var(--danger);
+    font-size: 11px;
+    word-break: break-all;
+}

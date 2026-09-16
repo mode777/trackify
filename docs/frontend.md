@@ -9,13 +9,16 @@ schema / auth details live in [`docs/database.md`](database.md).
 ## 1. Vite build setup
 
 Vite is rooted at `web/` (`vite.config.mjs:4`); the production
-output is `build/dist/`. Four HTML entry points are emitted
+output is `build/dist/`. Five HTML entry points are emitted
 (`vite.config.mjs:15-22`):
 
 - `index.html` → `build/dist/index.html` (shell)
 - `collections.html` → `build/dist/collections.html` (games service)
 - `playlist.html` → `build/dist/playlist.html` (playlist service)
 - `player.html` → `build/dist/player.html` (player service)
+- `admin.html` → `build/dist/admin.html` (standalone superuser page;
+  see [`docs/admin.md`](admin.md) — intentionally outside the
+  shell/iframe topology, no broker topics, no service id)
 
 ### Notable config flags
 
@@ -286,3 +289,15 @@ The CI verification step (`npm run verify:dist`) does **not**
 check that the set of HTML entry points matches the rollup input
 map — when adding a new page, run `npm run build` + `npm run verify:dist`
 locally to make sure the new asset is in `build/dist/`.
+
+### Adding a standalone page (no shell / broker)
+
+A page that should NOT join the iframe topology (e.g. the admin page)
+only needs steps 1–2 above plus its own CSS/JS — no `allowedServices`
+entry, no route registration, no frame broker. It talks to PocketBase
+directly with its own client instance and (if it authenticates
+differently) its own `LocalAuthStore` key so it cannot disturb the
+shell's session. See `web/admin.html` + [`docs/admin.md`](admin.md)
+for the working example. Note the shared identifier helpers such a page
+imports from `shared/` (repo root): `vite.config.mjs` adds the repo
+root to `server.fs.allow` so the dev server can serve them.

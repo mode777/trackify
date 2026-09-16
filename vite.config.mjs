@@ -20,11 +20,17 @@ export default defineConfig({
         collections: path.resolve(rootDir, 'collections.html'),
         playlist: path.resolve(rootDir, 'playlist.html'),
         player: path.resolve(rootDir, 'player.html'),
+        admin: path.resolve(rootDir, 'admin.html'),
       },
     },
   },
   server: {
     port: 8137,
     strictPort: true,
+    // Allow the dev server to serve /shared/ (imported by web/admin) and
+    // /web/ modules outside the Vite root.
+    fs: {
+      allow: [rootDir, process.cwd()],
+    },
   },
 });
