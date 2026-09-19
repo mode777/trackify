@@ -1,0 +1,93 @@
+name: docs
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "landing/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "landing/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      # The landing page must never leak the privately hosted instance's
+      # hostname. Set the PRIVATE_INSTANCE_HOSTNAME repo variable to enable
+      # the scan (no-op while unset; the repository scan remains authoritative).
+      - name: Scan landing for private hostname
+        env:
+          PRIVATE_HOSTNAME: ${{ vars.PRIVATE_INSTANCE_HOSTNAME }}
+        run: |
+          [ -z "$PRIVATE_HOSTNAME" ] && { echo "No PRIVATE_INSTANCE_HOSTNAME variable set — scan skipped."; exit 0; }
+          if grep -rF -l -- "$PRIVATE_HOSTNAME" landing/; then
+            echo "::error::landing/ references the privately hosted instance hostname"
+            exit 1
+          fi
+          echo "landing/ is clean."
+
+      # Compose the Pages artifact: the landing page occupies the site root.
+      - name: Compose Pages artifact
+        run: |
+          mkdir -p _pages
+          cp -r landing/. _pages/
+
+      - name: Check landing links
+        run: |
+          missing=0
+          while IFS= read -r ref; do
+            target="_pages/${ref}"
+            if [[ $target == */ ]]; then
+              target="${target}index.html"
+            fi
+            if [ ! -e "$target" ]; then
+              echo "BROKEN LINK: $ref -> $target"
+              missing=1
+            fi
+          done < <(grep -oE '(href|src)="[^"]+"' _pages/index.html \
+            | sed -E 's/^(href|src)="//; s/"$//' \
+            | grep -vE '^(https?:|mailto:|data:|#)' || true)
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::landing/index.html contains links that do not resolve in the Pages artifact"
+            exit 1
+          fi
+          echo "All landing links resolve."
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _pages
+
+  deploy:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
