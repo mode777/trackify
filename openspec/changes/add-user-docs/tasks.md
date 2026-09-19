@@ -26,6 +26,6 @@
 
 ## 5. End-to-end verification
 
-- [ ] 5.1 PR run: open a PR touching `user-docs/` and `landing/index.html`; confirm build + checks pass and no deploy occurs. Verify: green PR run, no deployment.
-- [ ] 5.2 Merge to `main`; confirm `https://mode777.github.io/trackify/docs/` serves the docs with working search, sidebar navigation, deep-link reload, and that the landing Docs button reaches it. Verify: manual visit of root, `/docs/`, and one nested page.
-- [ ] 5.3 Operator walkthrough from the docs: follow Getting Started + Hosting on a clean checkout to a running instance. Verify: each documented command works as written; discrepancies fixed in the docs before closing.
+- [x] 5.1 PR run: open a PR touching `user-docs/` and `landing/index.html`; confirm build + checks pass and no deploy occurs. Verify: green PR run, no deployment.
+- [x] 5.2 Merge to `main`; confirm `https://mode777.github.io/trackify/docs/` serves the docs with working search, sidebar navigation, deep-link reload, and that the landing Docs button reaches it. Verify: manual visit of root, `/docs/`, and one nested page.
+- [x] 5.3 Operator walkthrough from the docs: follow Getting Started + Hosting on a clean checkout to a running instance. Verify: each documented command works as written; discrepancies fixed in the docs before closing.
