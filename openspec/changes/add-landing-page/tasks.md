@@ -17,7 +17,7 @@
 
 ## 3. Enablement and verification
 
-- [ ] 3.1 Enable GitHub Pages with Source: "GitHub Actions" in repository settings (one-time manual step). Verify: setting visible in repo Settings → Pages.
-- [ ] 3.2 Open a PR touching `landing/` and confirm the checks job passes (build + scan + link check) with no deploy attempt. Verify: green PR run.
-- [ ] 3.3 Merge to `main` and confirm the site is live at `https://mode777.github.io/trackify/` with all sections, favicon, and working anchor links. Verify: manual visit + link check green in the deploy run.
+- [x] 3.1 Enable GitHub Pages with Source: "GitHub Actions" in repository settings (one-time manual step). Verify: setting visible in repo Settings → Pages.
+- [x] 3.2 Open a PR touching `landing/` and confirm the checks job passes (build + scan + link check) with no deploy attempt. Verify: green PR run.
+- [x] 3.3 Merge to `main` and confirm the site is live at `https://mode777.github.io/trackify/` with all sections, favicon, and working anchor links. Verify: manual visit + link check green in the deploy run.
 - [x] 3.4 Content accuracy pass: compare the formats table against README "Backends at a glance" (extensions and core names). Verify: each listed format maps to a real backend in `backends/<core>/CMakeLists.txt`.
