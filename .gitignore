@@ -32,4 +32,5 @@ node_modules/
 bin/
 
 /pb_data/
+/sample-files/
 .env

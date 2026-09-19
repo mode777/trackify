@@ -115,11 +115,13 @@ Direct invocation: `node tools/verify-build-output.mjs`
 
 ## Sample-data tooling
 
-The `sample-files/` directory is **reference data, not a staged web
-asset**. These four scripts scan it, enrich it, and push it to
-PocketBase. `sample-files/` is intentionally not copied into
-`build/web-public/`; the production app reads catalog data from
-PocketBase at runtime via the JS SDK.
+The `sample-files/` directory is **local reference data and is not
+tracked in this repository** (gitignored). These four scripts operate
+on a local copy if you create one — e.g. by downloading albums with
+`npm run khinsider:download` — enrich it, and push it to PocketBase.
+`sample-files/` is never copied into `build/web-public/`; the
+production app reads catalog data from PocketBase at runtime via the
+JS SDK.
 
 ### `tools/generate-sample-index.mjs`
 

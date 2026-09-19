@@ -1,6 +1,6 @@
 # Plan: Web Audio Player for VGM reference files
 
-Build a clean, single-page web audio player that reuses the generic `webaudio-player` plus the `webpsx` (PSX/PSF) and `websnes` (SNES/SPC) cores. The two emscripten backends are compiled with **CMake via `emcmake`** (new `CMakeLists.txt` replicating the existing `makeEmscripten.bat` flags/exports), and a minimal hand-written UI auto-selects the backend by file extension. The [sample-files](sample-files) folder is local reference data, not a staged static web asset.
+Build a clean, single-page web audio player that reuses the generic `webaudio-player` plus the `webpsx` (PSX/PSF) and `websnes` (SNES/SPC) cores. The two emscripten backends are compiled with **CMake via `emcmake`** (new `CMakeLists.txt` replicating the existing `makeEmscripten.bat` flags/exports), and a minimal hand-written UI auto-selects the backend by file extension. The sample-files folder is untracked local reference data, not a staged static web asset.
 
 ## Phase 1 — Toolchain setup
 1. Install + activate emsdk (one-time): `emsdk install latest` then `emsdk activate latest` in [submodules/emsdk](submodules/emsdk). Build commands run from the `emsdk_env` shell.

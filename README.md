@@ -134,7 +134,7 @@ trackify/
 │   └── main.js
 ├── pb_hooks/                     # PocketBase JS hooks
 ├── pb_migrations/                # PocketBase JS schema migrations (timestamped)
-├── sample-files/                 # reference track corpus (not a staged web asset)
+├── sample-files/                 # reference track corpus (gitignored, local only)
 ├── playlists/                    # hand-curated track lists (.txt)
 ├── Dockerfile                    # pocketbase + build/dist
 ├── publish.sh                    # buildx + push entry point
@@ -215,10 +215,12 @@ auth lifecycle) is documented in
 
 ## Sample data tooling
 
-The `sample-files/` directory is **reference data, not a staged web
-asset**. The `tools/*.mjs` scripts scan it, fetch missing cover art
-via Wikipedia, and push the resulting `index.json` + `games.json` to
-PocketBase.
+The `sample-files/` directory is **local reference data and is not
+tracked in this repository** (gitignored). The `tools/*.mjs` scripts
+operate on it if you create it locally — e.g. by downloading albums
+with `npm run khinsider:download` — and scan it, fetch missing cover
+art via Wikipedia, and push the resulting `index.json` + `games.json`
+to PocketBase.
 
 Per-tool reference (purpose, env vars, exit codes, direct
 invocation) lives in [`docs/tools.md`](docs/tools.md).

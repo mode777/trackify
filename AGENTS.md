@@ -245,8 +245,10 @@ persistence, release checklist) lives in [`docs/deploy.md`](docs/deploy.md).
   hardcode the list of required runtime files. Update **both** when adding a
   new backend. The "Adding a new backend" and "Adding a new tool" sections
   of the relevant doc spell out where to look.
-- `sample-files/` is reference data, not a staged web asset. It is scanned
-  by `tools/generate-sample-index.mjs` to produce `sample-files/index.json`
+- `sample-files/` is **gitignored local reference data, not tracked in
+  the repo** (it held copyrighted game rips and was purged from
+  history). The tools still operate on it if you create it locally:
+  `tools/generate-sample-index.mjs` produces `sample-files/index.json`
   and `sample-files/games.json`; the latter is consumed by
   `tools/fetch-missing-cover-art.mjs` (Wikipedia summary → MediaWiki
   page-image → infobox scrape; tunables documented in `docs/tools.md`).
