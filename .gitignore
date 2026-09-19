@@ -29,6 +29,10 @@ Thumbs.db
 # Node / web tooling
 node_modules/
 
+# Docs site build artifacts (sources under user-docs/ are tracked)
+user-docs/.vitepress/dist
+user-docs/.vitepress/cache
+
 bin/
 
 /pb_data/

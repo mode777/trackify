@@ -5,10 +5,12 @@ on:
     branches: ["main"]
     paths:
       - "landing/**"
+      - "user-docs/**"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "landing/**"
+      - "user-docs/**"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -26,27 +28,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: user-docs/package-lock.json
+
+      - name: Install docs dependencies
+        working-directory: user-docs
+        run: npm ci
+
+      - name: Build docs site
+        working-directory: user-docs
+        run: npm run build
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      # The landing page must never leak the privately hosted instance's
-      # hostname. Set the PRIVATE_INSTANCE_HOSTNAME repo variable to enable
-      # the scan (no-op while unset; the repository scan remains authoritative).
-      - name: Scan landing for private hostname
+      # The landing page and docs must never leak the privately hosted
+      # instance's hostname. Set the PRIVATE_INSTANCE_HOSTNAME repo variable
+      # to enable the scan (no-op while unset; the repository scan remains
+      # authoritative).
+      - name: Scan site sources for private hostname
         env:
           PRIVATE_HOSTNAME: ${{ vars.PRIVATE_INSTANCE_HOSTNAME }}
         run: |
           [ -z "$PRIVATE_HOSTNAME" ] && { echo "No PRIVATE_INSTANCE_HOSTNAME variable set — scan skipped."; exit 0; }
-          if grep -rF -l -- "$PRIVATE_HOSTNAME" landing/; then
-            echo "::error::landing/ references the privately hosted instance hostname"
+          if grep -rF -l -- "$PRIVATE_HOSTNAME" landing/ user-docs/ --exclude-dir=node_modules --exclude-dir=dist; then
+            echo "::error::site sources reference the privately hosted instance hostname"
             exit 1
           fi
-          echo "landing/ is clean."
+          echo "landing/ and user-docs/ are clean."
 
-      # Compose the Pages artifact: the landing page occupies the site root.
+      # Compose the Pages artifact: the landing page occupies the site root,
+      # docs live under docs/ (base path /trackify/docs/).
       - name: Compose Pages artifact
         run: |
-          mkdir -p _pages
+          mkdir -p _pages/docs
+          cp -r user-docs/.vitepress/dist/* _pages/docs/
           cp -r landing/. _pages/
 
       - name: Check landing links
